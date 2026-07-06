@@ -4,10 +4,12 @@ import { Model } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 import { User, UserStatus } from './users.schema';
 import { CreateUserDto } from './dto/create-user.dto';
+import { CreateUserByAdminDto } from './dto/create-user-by-admin.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
 
 @Injectable()
 export class UsersService {
-  constructor(@InjectModel(User.name) private userModel: Model<User>) {}
+  constructor(@InjectModel(User.name) private userModel: Model<User>) { }
 
   async create(data: CreateUserDto): Promise<User> {
     const hashedPassword = await bcrypt.hash(data.password, 10);
@@ -16,6 +18,24 @@ export class UsersService {
       password: hashedPassword,
     });
     return created.save();
+  }
+
+  async createByAdmin(data: CreateUserByAdminDto): Promise<User> {
+    const hashedPassword = await bcrypt.hash(data.password, 10);
+    const created = new this.userModel({
+      ...data,
+      password: hashedPassword,
+      status: UserStatus.ACTIVE, // el admin los crea ya activos
+    });
+    return created.save();
+  }
+
+  async update(id: string, data: UpdateUserDto): Promise<User> {
+    const user = await this.userModel.findByIdAndUpdate(id, data, { new: true });
+    if (!user) {
+      throw new NotFoundException(`User with id ${id} not found`);
+    }
+    return user;
   }
 
   async findAll(): Promise<User[]> {
@@ -47,6 +67,6 @@ export class UsersService {
   }
 
   async findByEmail(email: string): Promise<User | null> {
-  return this.userModel.findOne({ email }).exec();
-}
+    return this.userModel.findOne({ email }).exec();
+  }
 }
