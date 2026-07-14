@@ -1,8 +1,18 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { CreateUserByAdminDto } from './dto/create-user-by-admin.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { UpdateOwnProfileDto } from './dto/update-own-profile.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -10,7 +20,7 @@ import { Role } from './users.schema';
 
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) { }
+  constructor(private readonly usersService: UsersService) {}
 
   @Post()
   create(@Body() body: CreateUserDto) {
@@ -23,6 +33,20 @@ export class UsersController {
   createByAdmin(@Body() body: CreateUserByAdminDto) {
     return this.usersService.createByAdmin(body);
   }
+
+  // --- Rutas de perfil propio: cualquier usuario autenticado, sin requerir admin ---
+  @UseGuards(JwtAuthGuard)
+  @Get('me')
+  getMe(@Req() req: any) {
+    return this.usersService.findOne(req.user.userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('me')
+  updateMe(@Req() req: any, @Body() body: UpdateOwnProfileDto) {
+    return this.usersService.update(req.user.userId, body);
+  }
+  // --- Fin rutas de perfil propio ---
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
