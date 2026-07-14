@@ -48,6 +48,15 @@ export class UsersController {
   }
   // --- Fin rutas de perfil propio ---
 
+  // --- Lista de clientes activos, para que entrenadores puedan elegirlos al crear sesiones ---
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.TRAINER, Role.ADMIN)
+  @Get('clients')
+  listActiveClients() {
+    return this.usersService.findActiveClients();
+  }
+  // --- Fin lista de clientes activos ---
+
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
   @Patch(':id')

@@ -79,6 +79,13 @@ export class UsersService {
     return user;
   }
 
+  async findActiveClients(): Promise<User[]> {
+  return this.userModel
+    .find({ roles: Role.CLIENT, status: UserStatus.ACTIVE })
+    .select('firstName lastName')
+    .exec();
+}
+
   async approve(id: string): Promise<User> {
     const user = await this.userModel.findByIdAndUpdate(
       id,
