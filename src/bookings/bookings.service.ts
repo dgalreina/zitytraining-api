@@ -67,6 +67,22 @@ export class BookingsService {
       .exec();
   }
 
+  async findByClientAndRange(
+    clientId: string,
+    from: string,
+    to: string,
+  ): Promise<Booking[]> {
+    return this.bookingModel
+      .find({
+        clients: clientId,
+        startTime: { $gte: new Date(from) },
+        endTime: { $lte: new Date(to) },
+      })
+      .populate('trainer', 'firstName lastName')
+      .populate('clients', 'firstName lastName')
+      .exec();
+  }
+
   async update(id: string, data: UpdateBookingDto): Promise<Booking> {
     const existing = await this.bookingModel.findById(id);
     if (!existing) {

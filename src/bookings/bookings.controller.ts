@@ -2,12 +2,15 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   Param,
   Patch,
   Post,
   Query,
+  Req,
   UseGuards,
+  BadRequestException,
 } from '@nestjs/common';
 import { BookingsService } from './bookings.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
@@ -25,12 +28,34 @@ export class BookingsController {
   }
 
   @Get()
-  findByTrainerAndRange(
-    @Query('trainer') trainer: string,
-    @Query('from') from: string,
-    @Query('to') to: string,
+  find(
+    @Req() req: any,
+    @Query('trainer') trainer?: string,
+    @Query('client') client?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
   ) {
-    return this.bookingsService.findByTrainerAndRange(trainer, from, to);
+    const isAdmin = req.user.roles?.includes('admin');
+
+    if (!from || !to) {
+      throw new BadRequestException('Debes indicar from y to');
+    }
+
+    if (client) {
+      if (!isAdmin && client !== req.user.userId) {
+        throw new ForbiddenException('No puedes ver el calendario de otro cliente');
+      }
+      return this.bookingsService.findByClientAndRange(client, from, to);
+    }
+
+    if (trainer) {
+      if (!isAdmin && trainer !== req.user.userId) {
+        throw new ForbiddenException('No puedes ver el calendario de otro entrenador');
+      }
+      return this.bookingsService.findByTrainerAndRange(trainer, from, to);
+    }
+
+    throw new BadRequestException('Debes indicar trainer o client');
   }
 
   @Patch(':id')
