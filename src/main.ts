@@ -8,7 +8,7 @@ async function bootstrap() {
   app.enableCors({
   origin: [
     'http://localhost:3000',
-    'https://https://zitytraining-api-cjy9c.ondigitalocean.app/',
+    'https://zitytraining-web-6tkjf.ondigitalocean.app/',
   ],
 });
   await app.listen(process.env.PORT ?? 3001);
