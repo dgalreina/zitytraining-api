@@ -22,6 +22,14 @@ export class PurchasesController {
     return this.purchasesService.findByClient(req.user.userId);
   }
 
+  // Admin o entrenador: ver las compras de un cliente concreto
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN, Role.TRAINER)
+  @Get('client/:id')
+  findByClient(@Param('id') id: string) {
+    return this.purchasesService.findByClient(id);
+  }
+
   // Temporal, mientras no está Stripe conectado: el admin puede marcar
   // manualmente una compra como pagada, para poder probar el resto del flujo.
   @UseGuards(RolesGuard)
