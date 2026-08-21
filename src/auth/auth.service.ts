@@ -40,6 +40,7 @@ export class AuthService {
         lastName: user.lastName,
         email: user.email,
         roles: user.roles,
+        color: user.color || null,
       },
     };
   }

@@ -78,7 +78,7 @@ export class BookingsService {
         startTime: { $gte: new Date(from) },
         endTime: { $lte: new Date(to) },
       })
-      .populate('trainer', 'firstName lastName')
+      .populate('trainer', 'firstName lastName color')
       .populate('clients', 'firstName lastName')
       .exec();
   }
