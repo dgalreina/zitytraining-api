@@ -32,6 +32,7 @@ export class BookingsController {
     @Req() req: any,
     @Query('trainer') trainer?: string,
     @Query('client') client?: string,
+    @Query('scope') scope?: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
   ) {
@@ -39,6 +40,15 @@ export class BookingsController {
 
     if (!from || !to) {
       throw new BadRequestException('Debes indicar from y to');
+    }
+
+    // Vista "ver todos los entrenadores a la vez": admin o entrenador.
+    if (scope === 'all') {
+      const isTrainerRole = req.user.roles?.includes('trainer');
+      if (!isAdmin && !isTrainerRole) {
+        throw new ForbiddenException('Solo un administrador o entrenador puede ver todos los entrenadores');
+      }
+      return this.bookingsService.findAllInRange(from, to);
     }
 
     if (client) {
@@ -55,7 +65,7 @@ export class BookingsController {
       return this.bookingsService.findByTrainerAndRange(trainer, from, to);
     }
 
-    throw new BadRequestException('Debes indicar trainer o client');
+    throw new BadRequestException('Debes indicar trainer, client, o scope=all');
   }
 
   @Patch(':id')

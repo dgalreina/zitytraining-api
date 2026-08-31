@@ -83,6 +83,19 @@ export class BookingsService {
       .exec();
   }
 
+  // Admin: todas las sesiones de todos los entrenadores en un rango,
+  // para la vista "ver todos a la vez" coloreada por entrenador.
+  async findAllInRange(from: string, to: string): Promise<Booking[]> {
+    return this.bookingModel
+      .find({
+        startTime: { $gte: new Date(from) },
+        endTime: { $lte: new Date(to) },
+      })
+      .populate('trainer', 'firstName lastName color')
+      .populate('clients', 'firstName lastName')
+      .exec();
+  }
+
   async update(id: string, data: UpdateBookingDto): Promise<Booking> {
     const existing = await this.bookingModel.findById(id);
     if (!existing) {
