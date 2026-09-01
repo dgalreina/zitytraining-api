@@ -16,6 +16,8 @@ export class UsersService {
     const created = new this.userModel({
       ...data,
       password: hashedPassword,
+      roles: [Role.CLIENT],
+      status: UserStatus.PENDING,
     });
     return created.save();
   }
@@ -27,27 +29,34 @@ export class UsersService {
 
   async createByAdmin(data: CreateUserByAdminDto): Promise<User> {
   const hashedPassword = await bcrypt.hash(data.password, 10);
+  const isClient = data.roles.includes(Role.CLIENT);
 
-  const membershipNumber = data.roles.includes(Role.CLIENT)
-    ? await this.generateMembershipNumber()
-    : undefined;
+  const maxAttempts = 5;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const membershipNumber = isClient ? await this.generateMembershipNumber() : undefined;
 
-  try {
-    const created = new this.userModel({
-      ...data,
-      password: hashedPassword,
-      status: UserStatus.ACTIVE,
-      membershipNumber,
-    });
-    return await created.save();
-  } catch (err: any) {
-    if (err.code === 11000) {
-      const field = Object.keys(err.keyValue)[0];
-      const label = this.fieldNames[field] || field;
-      throw new ConflictException(`Ya existe un usuario con ese ${label}`);
+    try {
+      const created = new this.userModel({
+        ...data,
+        password: hashedPassword,
+        status: UserStatus.ACTIVE,
+        membershipNumber,
+      });
+      return await created.save();
+    } catch (err: any) {
+      if (err.code === 11000) {
+        const field = Object.keys(err.keyValue)[0];
+        // Colisión de número de socio por carrera entre altas simultáneas: reintentamos con uno nuevo.
+        if (field === 'membershipNumber' && attempt < maxAttempts) {
+          continue;
+        }
+        const label = this.fieldNames[field] || field;
+        throw new ConflictException(`Ya existe un usuario con ese ${label}`);
+      }
+      throw err;
     }
-    throw err;
   }
+  throw new ConflictException('No se pudo generar un número de socio único, inténtalo de nuevo');
 }
 
   async update(id: string, data: UpdateUserDto): Promise<User> {

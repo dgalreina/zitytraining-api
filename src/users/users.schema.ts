@@ -14,7 +14,15 @@ export enum UserStatus {
   REJECTED = 'rejected',
 }
 
-@Schema({ timestamps: true })
+@Schema({
+  timestamps: true,
+  toJSON: {
+    transform: (_doc, ret: Record<string, unknown>) => {
+      delete ret.password;
+      return ret;
+    },
+  },
+})
 export class User extends Document {
   @Prop({ required: true })
   firstName!: string;

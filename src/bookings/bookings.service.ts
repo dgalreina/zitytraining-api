@@ -11,12 +11,13 @@ export class BookingsService {
 
   private async assertNoOverlap(
     trainerId: string,
+    clientIds: string[],
     startTime: Date,
     endTime: Date,
     excludeId?: string,
   ) {
     const query: any = {
-      trainer: trainerId,
+      $or: [{ trainer: trainerId }, { clients: { $in: clientIds } }],
       startTime: { $lt: endTime },
       endTime: { $gt: startTime },
     };
@@ -28,8 +29,11 @@ export class BookingsService {
     const overlapping = await this.bookingModel.findOne(query).exec();
 
     if (overlapping) {
+      const trainerConflict = overlapping.trainer.toString() === trainerId;
       throw new ConflictException(
-        'El entrenador ya tiene una sesión en ese horario',
+        trainerConflict
+          ? 'El entrenador ya tiene una sesión en ese horario'
+          : 'Uno de los clientes ya tiene una sesión en ese horario',
       );
     }
   }
@@ -42,7 +46,7 @@ export class BookingsService {
       throw new ConflictException('La hora de fin debe ser posterior a la de inicio');
     }
 
-    await this.assertNoOverlap(data.trainer, startTime, endTime);
+    await this.assertNoOverlap(data.trainer, data.clients, startTime, endTime);
 
     const created = new this.bookingModel({
       ...data,
@@ -60,8 +64,8 @@ export class BookingsService {
     return this.bookingModel
       .find({
         trainer: trainerId,
-        startTime: { $gte: new Date(from) },
-        endTime: { $lte: new Date(to) },
+        startTime: { $lt: new Date(to) },
+        endTime: { $gt: new Date(from) },
       })
       .populate('clients', 'firstName lastName')
       .exec();
@@ -79,8 +83,8 @@ export class BookingsService {
     return this.bookingModel
       .find({
         trainer: { $in: trainerIds },
-        startTime: { $gte: new Date(from) },
-        endTime: { $lte: new Date(to) },
+        startTime: { $lt: new Date(to) },
+        endTime: { $gt: new Date(from) },
       })
       .populate('trainer', 'firstName lastName color')
       .populate('clients', 'firstName lastName')
@@ -95,8 +99,8 @@ export class BookingsService {
     return this.bookingModel
       .find({
         clients: clientId,
-        startTime: { $gte: new Date(from) },
-        endTime: { $lte: new Date(to) },
+        startTime: { $lt: new Date(to) },
+        endTime: { $gt: new Date(from) },
       })
       .populate('trainer', 'firstName lastName color')
       .populate('clients', 'firstName lastName')
@@ -107,8 +111,8 @@ export class BookingsService {
   async findAllInRange(from: string, to: string): Promise<Booking[]> {
     return this.bookingModel
       .find({
-        startTime: { $gte: new Date(from) },
-        endTime: { $lte: new Date(to) },
+        startTime: { $lt: new Date(to) },
+        endTime: { $gt: new Date(from) },
       })
       .populate('trainer', 'firstName lastName color')
       .populate('clients', 'firstName lastName')
@@ -124,12 +128,13 @@ export class BookingsService {
     const startTime = data.startTime ? new Date(data.startTime) : existing.startTime;
     const endTime = data.endTime ? new Date(data.endTime) : existing.endTime;
     const trainerId = data.trainer || existing.trainer.toString();
+    const clientIds = data.clients || existing.clients.map((c) => c.toString());
 
     if (endTime <= startTime) {
       throw new ConflictException('La hora de fin debe ser posterior a la de inicio');
     }
 
-    await this.assertNoOverlap(trainerId, startTime, endTime, id);
+    await this.assertNoOverlap(trainerId, clientIds, startTime, endTime, id);
 
     const updated = await this.bookingModel.findByIdAndUpdate(
       id,
