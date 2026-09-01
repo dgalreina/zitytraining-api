@@ -38,6 +38,7 @@ export class BookingsController {
   find(
     @Req() req: any,
     @Query('trainer') trainer?: string,
+    @Query('trainers') trainersParam?: string,
     @Query('client') client?: string,
     @Query('scope') scope?: string,
     @Query('from') from?: string,
@@ -50,14 +51,6 @@ export class BookingsController {
       throw new BadRequestException('Debes indicar from y to');
     }
 
-    // Vista "ver todos los entrenadores a la vez": admin o entrenador.
-    if (scope === 'all') {
-      if (!isAdmin && !isTrainerRole) {
-        throw new ForbiddenException('Solo un administrador o entrenador puede ver todos los entrenadores');
-      }
-      return this.bookingsService.findAllInRange(from, to);
-    }
-
     // Filtro por cliente concreto: el propio cliente, o admin/entrenador
     // consultando (para poder ver el calendario de cualquier cliente).
     if (client) {
@@ -67,6 +60,23 @@ export class BookingsController {
       return this.bookingsService.findByClientAndRange(client, from, to);
     }
 
+    // Varios entrenadores a la vez (checklist): de 1 a N, admin o entrenador.
+    if (trainersParam) {
+      if (!isAdmin && !isTrainerRole) {
+        throw new ForbiddenException('No puedes ver el calendario de un entrenador');
+      }
+      const trainerIds = trainersParam.split(',').filter(Boolean);
+      return this.bookingsService.findByTrainersAndRange(trainerIds, from, to);
+    }
+
+    // Vista "todos los entrenadores", se mantiene por compatibilidad.
+    if (scope === 'all') {
+      if (!isAdmin && !isTrainerRole) {
+        throw new ForbiddenException('Solo un administrador o entrenador puede ver todos los entrenadores');
+      }
+      return this.bookingsService.findAllInRange(from, to);
+    }
+
     if (trainer) {
       if (!isAdmin && !isTrainerRole) {
         throw new ForbiddenException('No puedes ver el calendario de un entrenador');
@@ -74,7 +84,7 @@ export class BookingsController {
       return this.bookingsService.findByTrainerAndRange(trainer, from, to);
     }
 
-    throw new BadRequestException('Debes indicar trainer, client, o scope=all');
+    throw new BadRequestException('Debes indicar trainer, trainers, client, o scope=all');
   }
 
   @UseGuards(RolesGuard)

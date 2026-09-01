@@ -67,6 +67,26 @@ export class BookingsService {
       .exec();
   }
 
+  // Varios entrenadores a la vez (de 1 a N), para el filtro tipo checklist
+  // del calendario. Sustituye a "un entrenador" y a "todos" con una única
+  // consulta flexible.
+  async findByTrainersAndRange(
+    trainerIds: string[],
+    from: string,
+    to: string,
+  ): Promise<Booking[]> {
+    if (trainerIds.length === 0) return [];
+    return this.bookingModel
+      .find({
+        trainer: { $in: trainerIds },
+        startTime: { $gte: new Date(from) },
+        endTime: { $lte: new Date(to) },
+      })
+      .populate('trainer', 'firstName lastName color')
+      .populate('clients', 'firstName lastName')
+      .exec();
+  }
+
   async findByClientAndRange(
     clientId: string,
     from: string,
@@ -83,8 +103,7 @@ export class BookingsService {
       .exec();
   }
 
-  // Admin: todas las sesiones de todos los entrenadores en un rango,
-  // para la vista "ver todos a la vez" coloreada por entrenador.
+  // Se mantiene por compatibilidad con otras posibles llamadas existentes.
   async findAllInRange(from: string, to: string): Promise<Booking[]> {
     return this.bookingModel
       .find({
