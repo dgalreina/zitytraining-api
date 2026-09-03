@@ -8,6 +8,7 @@ import { AuthModule } from './auth/auth.module';
 import { BookingsModule } from './bookings/bookings.module';
 import { PurchasesModule } from './purchases/purchases.module';
 import { HealthFormsModule } from './health-forms/health-forms.module';
+import { ProgressModule } from './progress/progress.module';
 
 @Module({
   imports: [
@@ -23,7 +24,8 @@ import { HealthFormsModule } from './health-forms/health-forms.module';
     PurchasesModule,
     AuthModule,
     BookingsModule,
-    HealthFormsModule
+    HealthFormsModule,
+    ProgressModule
   ],
   controllers: [AppController],
   providers: [AppService],
