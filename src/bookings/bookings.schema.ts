@@ -25,6 +25,12 @@ export class Booking extends Document {
 
   @Prop({ type: String, enum: BookingStatus, default: BookingStatus.ACTIVE })
   status!: BookingStatus;
+
+  // Sesion personal del entrenador (bloquear su propio hueco, apuntarse
+  // algo, etc.): solo la ve y la gestiona quien la creo (trainer). No se
+  // puede cancelar, solo borrar.
+  @Prop({ type: Boolean, default: false })
+  isPrivate!: boolean;
 }
 
 export const BookingSchema = SchemaFactory.createForClass(Booking);

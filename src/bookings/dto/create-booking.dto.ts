@@ -1,12 +1,14 @@
-import { IsArray, IsDateString, IsMongoId, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsArray, IsBoolean, IsDateString, IsMongoId, IsOptional, IsString } from 'class-validator';
 
 export class CreateBookingDto {
   @IsMongoId()
   trainer!: string;
 
+  // Vacio (u omitido) en sesiones privadas: no llevan clientes.
+  @IsOptional()
   @IsArray()
   @IsMongoId({ each: true })
-  clients!: string[];
+  clients?: string[];
 
   @IsDateString()
   startTime!: string;
@@ -17,4 +19,8 @@ export class CreateBookingDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isPrivate?: boolean;
 }

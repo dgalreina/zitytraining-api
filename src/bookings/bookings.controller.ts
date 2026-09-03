@@ -26,11 +26,16 @@ export class BookingsController {
   constructor(private readonly bookingsService: BookingsService) {}
 
   // Solo admin o entrenador pueden crear/editar/borrar sesiones.
-  // Cualquier entrenador puede gestionar la de cualquier otro entrenador.
+  // Cualquier entrenador puede gestionar la de cualquier otro entrenador,
+  // salvo las privadas (ver bookings.service).
   @UseGuards(RolesGuard)
   @Roles(Role.ADMIN, Role.TRAINER)
   @Post()
-  create(@Body() body: CreateBookingDto) {
+  create(@Req() req: any, @Body() body: CreateBookingDto) {
+    // Una sesión privada siempre es de quien la crea, no se elige entrenador.
+    if (body.isPrivate) {
+      body.trainer = req.user.userId;
+    }
     return this.bookingsService.create(body);
   }
 
@@ -66,7 +71,7 @@ export class BookingsController {
         throw new ForbiddenException('No puedes ver el calendario de un entrenador');
       }
       const trainerIds = trainersParam.split(',').filter(Boolean);
-      return this.bookingsService.findByTrainersAndRange(trainerIds, from, to);
+      return this.bookingsService.findByTrainersAndRange(trainerIds, req.user.userId, from, to);
     }
 
     // Vista "todos los entrenadores", se mantiene por compatibilidad.
@@ -74,14 +79,14 @@ export class BookingsController {
       if (!isAdmin && !isTrainerRole) {
         throw new ForbiddenException('Solo un administrador o entrenador puede ver todos los entrenadores');
       }
-      return this.bookingsService.findAllInRange(from, to);
+      return this.bookingsService.findAllInRange(req.user.userId, from, to);
     }
 
     if (trainer) {
       if (!isAdmin && !isTrainerRole) {
         throw new ForbiddenException('No puedes ver el calendario de un entrenador');
       }
-      return this.bookingsService.findByTrainerAndRange(trainer, from, to);
+      return this.bookingsService.findByTrainerAndRange(trainer, req.user.userId, from, to);
     }
 
     throw new BadRequestException('Debes indicar trainer, trainers, client, o scope=all');
@@ -90,14 +95,14 @@ export class BookingsController {
   @UseGuards(RolesGuard)
   @Roles(Role.ADMIN, Role.TRAINER)
   @Patch(':id')
-  update(@Param('id') id: string, @Body() body: UpdateBookingDto) {
-    return this.bookingsService.update(id, body);
+  update(@Req() req: any, @Param('id') id: string, @Body() body: UpdateBookingDto) {
+    return this.bookingsService.update(id, body, req.user.userId);
   }
 
   @UseGuards(RolesGuard)
   @Roles(Role.ADMIN, Role.TRAINER)
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.bookingsService.remove(id);
+  remove(@Req() req: any, @Param('id') id: string) {
+    return this.bookingsService.remove(id, req.user.userId);
   }
 }

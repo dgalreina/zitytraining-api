@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Booking } from './bookings.schema';
@@ -41,15 +46,17 @@ export class BookingsService {
   async create(data: CreateBookingDto): Promise<Booking> {
     const startTime = new Date(data.startTime);
     const endTime = new Date(data.endTime);
+    const clients = data.clients ?? [];
 
     if (endTime <= startTime) {
       throw new ConflictException('La hora de fin debe ser posterior a la de inicio');
     }
 
-    await this.assertNoOverlap(data.trainer, data.clients, startTime, endTime);
+    await this.assertNoOverlap(data.trainer, clients, startTime, endTime);
 
     const created = new this.bookingModel({
       ...data,
+      clients,
       startTime,
       endTime,
     });
@@ -58,17 +65,20 @@ export class BookingsService {
 
   async findByTrainerAndRange(
     trainerId: string,
+    requestingUserId: string,
     from: string,
     to: string,
   ): Promise<Booking[]> {
-    return this.bookingModel
-      .find({
-        trainer: trainerId,
-        startTime: { $lt: new Date(to) },
-        endTime: { $gt: new Date(from) },
-      })
-      .populate('clients', 'firstName lastName')
-      .exec();
+    const query: Record<string, unknown> = {
+      trainer: trainerId,
+      startTime: { $lt: new Date(to) },
+      endTime: { $gt: new Date(from) },
+    };
+    // Las sesiones privadas de otro entrenador ni se listan.
+    if (trainerId !== requestingUserId) {
+      query.isPrivate = { $ne: true };
+    }
+    return this.bookingModel.find(query).populate('clients', 'firstName lastName').exec();
   }
 
   // Varios entrenadores a la vez (de 1 a N), para el filtro tipo checklist
@@ -76,6 +86,7 @@ export class BookingsService {
   // consulta flexible.
   async findByTrainersAndRange(
     trainerIds: string[],
+    requestingUserId: string,
     from: string,
     to: string,
   ): Promise<Booking[]> {
@@ -85,6 +96,7 @@ export class BookingsService {
         trainer: { $in: trainerIds },
         startTime: { $lt: new Date(to) },
         endTime: { $gt: new Date(from) },
+        $or: [{ isPrivate: { $ne: true } }, { trainer: requestingUserId }],
       })
       .populate('trainer', 'firstName lastName color')
       .populate('clients', 'firstName lastName')
@@ -108,21 +120,29 @@ export class BookingsService {
   }
 
   // Se mantiene por compatibilidad con otras posibles llamadas existentes.
-  async findAllInRange(from: string, to: string): Promise<Booking[]> {
+  async findAllInRange(
+    requestingUserId: string,
+    from: string,
+    to: string,
+  ): Promise<Booking[]> {
     return this.bookingModel
       .find({
         startTime: { $lt: new Date(to) },
         endTime: { $gt: new Date(from) },
+        $or: [{ isPrivate: { $ne: true } }, { trainer: requestingUserId }],
       })
       .populate('trainer', 'firstName lastName color')
       .populate('clients', 'firstName lastName')
       .exec();
   }
 
-  async update(id: string, data: UpdateBookingDto): Promise<Booking> {
+  async update(id: string, data: UpdateBookingDto, requestingUserId: string): Promise<Booking> {
     const existing = await this.bookingModel.findById(id);
     if (!existing) {
       throw new NotFoundException(`Booking with id ${id} not found`);
+    }
+    if (existing.isPrivate && existing.trainer.toString() !== requestingUserId) {
+      throw new ForbiddenException('No puedes modificar una sesión privada de otro usuario');
     }
 
     const startTime = data.startTime ? new Date(data.startTime) : existing.startTime;
@@ -144,10 +164,14 @@ export class BookingsService {
     return updated!;
   }
 
-  async remove(id: string): Promise<void> {
-    const result = await this.bookingModel.findByIdAndDelete(id);
-    if (!result) {
+  async remove(id: string, requestingUserId: string): Promise<void> {
+    const existing = await this.bookingModel.findById(id);
+    if (!existing) {
       throw new NotFoundException(`Booking with id ${id} not found`);
     }
+    if (existing.isPrivate && existing.trainer.toString() !== requestingUserId) {
+      throw new ForbiddenException('No puedes borrar una sesión privada de otro usuario');
+    }
+    await this.bookingModel.findByIdAndDelete(id);
   }
 }
