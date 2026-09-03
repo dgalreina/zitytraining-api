@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
@@ -129,6 +130,11 @@ export class UsersService {
       // como "sesión caducada" y cierra la sesión + redirige a /login, lo
       // cual sería muy raro solo por escribir mal la contraseña actual.
       throw new ForbiddenException('La contraseña actual no es correcta');
+    }
+
+    const newSameAsOld = await bcrypt.compare(data.newPassword, user.password);
+    if (newSameAsOld) {
+      throw new BadRequestException('La nueva contraseña tiene que ser distinta de la actual');
     }
 
     user.password = await bcrypt.hash(data.newPassword, 10);
