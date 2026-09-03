@@ -7,6 +7,7 @@ import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { BookingsModule } from './bookings/bookings.module';
 import { PurchasesModule } from './purchases/purchases.module';
+import { HealthFormsModule } from './health-forms/health-forms.module';
 
 @Module({
   imports: [
@@ -21,7 +22,8 @@ import { PurchasesModule } from './purchases/purchases.module';
     UsersModule,
     PurchasesModule,
     AuthModule,
-    BookingsModule
+    BookingsModule,
+    HealthFormsModule
   ],
   controllers: [AppController],
   providers: [AppService],
