@@ -14,35 +14,6 @@ import { UpdateBookingDto } from './dto/update-booking.dto';
 export class BookingsService {
   constructor(@InjectModel(Booking.name) private bookingModel: Model<Booking>) {}
 
-  private async assertNoOverlap(
-    trainerId: string,
-    clientIds: string[],
-    startTime: Date,
-    endTime: Date,
-    excludeId?: string,
-  ) {
-    const query: any = {
-      $or: [{ trainer: trainerId }, { clients: { $in: clientIds } }],
-      startTime: { $lt: endTime },
-      endTime: { $gt: startTime },
-    };
-
-    if (excludeId) {
-      query._id = { $ne: excludeId };
-    }
-
-    const overlapping = await this.bookingModel.findOne(query).exec();
-
-    if (overlapping) {
-      const trainerConflict = overlapping.trainer.toString() === trainerId;
-      throw new ConflictException(
-        trainerConflict
-          ? 'El entrenador ya tiene una sesión en ese horario'
-          : 'Uno de los clientes ya tiene una sesión en ese horario',
-      );
-    }
-  }
-
   async create(data: CreateBookingDto): Promise<Booking> {
     const startTime = new Date(data.startTime);
     const endTime = new Date(data.endTime);
@@ -51,8 +22,6 @@ export class BookingsService {
     if (endTime <= startTime) {
       throw new ConflictException('La hora de fin debe ser posterior a la de inicio');
     }
-
-    await this.assertNoOverlap(data.trainer, clients, startTime, endTime);
 
     const created = new this.bookingModel({
       ...data,
@@ -147,14 +116,10 @@ export class BookingsService {
 
     const startTime = data.startTime ? new Date(data.startTime) : existing.startTime;
     const endTime = data.endTime ? new Date(data.endTime) : existing.endTime;
-    const trainerId = data.trainer || existing.trainer.toString();
-    const clientIds = data.clients || existing.clients.map((c) => c.toString());
 
     if (endTime <= startTime) {
       throw new ConflictException('La hora de fin debe ser posterior a la de inicio');
     }
-
-    await this.assertNoOverlap(trainerId, clientIds, startTime, endTime, id);
 
     const updated = await this.bookingModel.findByIdAndUpdate(
       id,
