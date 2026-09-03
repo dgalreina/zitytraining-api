@@ -118,7 +118,7 @@ export class UsersService {
     return this.userModel.findOne({ email }).exec();
   }
 
-  async changePassword(id: string, data: ChangePasswordDto): Promise<void> {
+  async changePassword(id: string, data: ChangePasswordDto): Promise<{ success: true }> {
     const user = await this.userModel.findById(id);
     if (!user || !user.password) {
       throw new NotFoundException(`User with id ${id} not found`);
@@ -139,5 +139,6 @@ export class UsersService {
 
     user.password = await bcrypt.hash(data.newPassword, 10);
     await user.save();
+    return { success: true };
   }
 }
