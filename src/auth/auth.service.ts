@@ -2,7 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { UsersService } from '../users/users.service';
-import { UserStatus } from '../users/users.schema';
+import { Role, UserStatus } from '../users/users.schema';
 
 @Injectable()
 export class AuthService {
@@ -24,6 +24,17 @@ export class AuthService {
 
     if (user.status !== UserStatus.ACTIVE) {
       throw new UnauthorizedException('Tu cuenta aún no ha sido aprobada');
+    }
+
+    // Por ahora la app solo es para admin y entrenadores; los clientes
+    // puros (sin ninguno de esos dos roles) no pueden entrar todavía.
+    const canLogin = user.roles?.some(
+      (role) => role === Role.ADMIN || role === Role.TRAINER,
+    );
+    if (!canLogin) {
+      throw new UnauthorizedException(
+        'Esta app todavía no está disponible para clientes',
+      );
     }
 
     const payload = {
