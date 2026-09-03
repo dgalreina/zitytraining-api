@@ -1,6 +1,8 @@
 import {
   IsEmail,
   IsNotEmpty,
+  IsOptional,
+  IsString,
   IsStrongPassword,
   IsArray,
   IsEnum,
@@ -41,8 +43,9 @@ export class CreateUserByAdminDto {
   @IsNotEmpty()
   phone!: string;
 
-  @IsNotEmpty()
-  address!: string;
+  @IsOptional()
+  @IsString()
+  address?: string;
 
   @IsArray()
   @IsEnum(Role, { each: true })
