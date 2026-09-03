@@ -13,7 +13,10 @@ export class AuthService {
 
   async login(email: string, password: string) {
     const user = await this.usersService.findByEmail(email);
-    if (!user) {
+    // Sin password (típicamente un cliente, que no lo necesita) no hay
+    // nada que comparar: bcrypt.compare fallaría igualmente con un hash
+    // vacío, mejor cortar aquí con el mismo mensaje genérico de siempre.
+    if (!user || !user.password) {
       throw new UnauthorizedException('Credenciales inválidas');
     }
 

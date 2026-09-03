@@ -33,11 +33,16 @@ export class User extends Document {
   @Prop({ required: true })
   dateOfBirth!: Date;
 
-  @Prop({ required: true, unique: true })
-  email!: string;
+  // Solo obligatorio para admin/entrenador (se valida en el DTO); un
+  // cliente puede no tener email. sparse: para que varios clientes sin
+  // email no choquen entre sí en el índice único.
+  @Prop({ required: false, unique: true, sparse: true })
+  email?: string;
 
-  @Prop({ required: true })
-  password!: string;
+  // Igual que email: obligatorio para admin/entrenador (pueden entrar en
+  // la app), pero un cliente no lo necesita.
+  @Prop({ required: false })
+  password?: string;
 
   @Prop({ required: true })
   phone!: string;
@@ -50,9 +55,6 @@ export class User extends Document {
 
   @Prop({ type: String, enum: UserStatus, default: UserStatus.PENDING })
   status!: UserStatus;
-
-  @Prop({ required: false, unique: true, sparse: true })
-  membershipNumber?: string;
 
   @Prop({ required: false })
   color?: string; // color asignado al entrenador, ej. '#6aa842'

@@ -13,6 +13,7 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { CreateUserByAdminDto } from './dto/create-user-by-admin.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UpdateOwnProfileDto } from './dto/update-own-profile.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -45,6 +46,12 @@ export class UsersController {
   @Patch('me')
   updateMe(@Req() req: any, @Body() body: UpdateOwnProfileDto) {
     return this.usersService.update(req.user.userId, body);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('me/password')
+  changeMyPassword(@Req() req: any, @Body() body: ChangePasswordDto) {
+    return this.usersService.changePassword(req.user.userId, body);
   }
   // --- Fin rutas de perfil propio ---
 
