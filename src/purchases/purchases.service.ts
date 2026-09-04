@@ -24,13 +24,14 @@ export class PurchasesService {
       ...data,
       client: clientId,
       status: PurchaseStatus.PENDING,
+      createdBy: clientId, // autoservicio: el cliente se lo compra a sí mismo
     });
     return created.save();
   }
 
   // Entrenador/admin asignando un plan directamente, pagado en mano: se
   // activa al momento, sin pasar por Stripe. Siempre suscripcion mensual.
-  async assignPlan(data: AssignPlanDto): Promise<Purchase> {
+  async assignPlan(data: AssignPlanDto, actorId: string): Promise<Purchase> {
     const created = new this.purchaseModel({
       client: data.client,
       type: PurchaseType.PLAN,
@@ -41,6 +42,7 @@ export class PurchasesService {
       status: PurchaseStatus.ACTIVE,
       activatedAt: data.startDate ? new Date(data.startDate) : new Date(),
       assignedInPerson: true,
+      createdBy: actorId,
     });
     return created.save();
   }
@@ -49,7 +51,7 @@ export class PurchasesService {
   // ya tenía un plan activo, se pausa mientras dura el puntual, y se
   // retoma solo (sin cambiar su fecha de inicio original) cuando el
   // puntual acaba, ya sea por caducar o por pararlo a mano.
-  async assignPunctualPlan(data: AssignPunctualPlanDto): Promise<Purchase> {
+  async assignPunctualPlan(data: AssignPunctualPlanDto, actorId: string): Promise<Purchase> {
     const currentActive = await this.purchaseModel.findOne({
       client: data.client,
       type: PurchaseType.PLAN,
@@ -73,6 +75,7 @@ export class PurchasesService {
       scheduledEndDate: new Date(data.endDate),
       pausedPlan: currentActive ? currentActive._id : undefined,
       assignedInPerson: true,
+      createdBy: actorId,
     });
     return created.save();
   }
@@ -81,7 +84,7 @@ export class PurchasesService {
   // A diferencia del puntual, es definitivo: el plan anterior (y el que
   // este a su vez tuviera pausado, si lo hubiera) queda cerrado para
   // siempre, no se retoma nada.
-  async changePlan(data: AssignPlanDto): Promise<Purchase> {
+  async changePlan(data: AssignPlanDto, actorId: string): Promise<Purchase> {
     const currentActive = await this.purchaseModel.findOne({
       client: data.client,
       type: PurchaseType.PLAN,
@@ -97,23 +100,29 @@ export class PurchasesService {
 
       currentActive.status = PurchaseStatus.CANCELLED;
       currentActive.endedAt = new Date();
+      currentActive.endedBy = actorId as any;
+      currentActive.endReason = 'changed';
+      currentActive.replacedByLabel = data.itemLabel;
       await currentActive.save();
 
       if (currentActive.pausedPlan) {
         await this.purchaseModel.findByIdAndUpdate(currentActive.pausedPlan, {
           status: PurchaseStatus.CANCELLED,
           endedAt: new Date(),
+          endedBy: actorId,
+          endReason: 'changed',
+          replacedByLabel: data.itemLabel,
         });
       }
     }
 
-    return this.assignPlan(data);
+    return this.assignPlan(data, actorId);
   }
 
   // Para un plan asignado a mano en cualquier momento; se queda como
   // historial con la fecha de inicio y de fin. Si era un plan puntual que
   // había pausado otro, se retoma el pausado.
-  async cancel(id: string): Promise<Purchase> {
+  async cancel(id: string, actorId: string): Promise<Purchase> {
     const existing = await this.purchaseModel.findById(id);
     if (!existing) {
       throw new NotFoundException(`Purchase with id ${id} not found`);
@@ -128,6 +137,8 @@ export class PurchasesService {
 
     existing.status = PurchaseStatus.CANCELLED;
     existing.endedAt = new Date();
+    existing.endedBy = actorId as any;
+    existing.endReason = 'cancelled';
     await existing.save();
 
     if (existing.pausedPlan) {
@@ -167,6 +178,8 @@ export class PurchasesService {
     return this.purchaseModel
       .find({ client: clientId })
       .sort({ createdAt: -1 })
+      .populate('createdBy', 'firstName lastName color')
+      .populate('endedBy', 'firstName lastName color')
       .exec();
   }
 

@@ -70,6 +70,22 @@ export class Purchase extends Document {
   // para saber a cuál volver cuando el puntual termine.
   @Prop({ type: Types.ObjectId, ref: 'Purchase', required: false })
   pausedPlan?: Types.ObjectId;
+
+  // Quién lo creó: el propio cliente en el autoservicio de Stripe, o el
+  // entrenador/admin que lo asignó a mano. Para el historial.
+  @Prop({ type: Types.ObjectId, ref: 'User', required: false })
+  createdBy?: Types.ObjectId;
+
+  // Quién lo paró o cambió (solo planes asignados a mano). Para el historial.
+  @Prop({ type: Types.ObjectId, ref: 'User', required: false })
+  endedBy?: Types.ObjectId;
+
+  @Prop({ type: String, enum: ['cancelled', 'changed'], required: false })
+  endReason?: 'cancelled' | 'changed';
+
+  // Solo si endReason es 'changed': snapshot del nombre del plan que lo sustituyó.
+  @Prop({ required: false })
+  replacedByLabel?: string;
 }
 
 export const PurchaseSchema = SchemaFactory.createForClass(Purchase);

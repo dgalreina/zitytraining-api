@@ -54,8 +54,8 @@ export class PurchasesController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN, Role.TRAINER)
   @Post('assign')
-  assignPlan(@Body() body: AssignPlanDto) {
-    return this.purchasesService.assignPlan(body);
+  assignPlan(@Req() req: any, @Body() body: AssignPlanDto) {
+    return this.purchasesService.assignPlan(body, req.user.userId);
   }
 
   // Admin o entrenador: plan puntual con fecha de fin; pausa el plan
@@ -63,8 +63,8 @@ export class PurchasesController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN, Role.TRAINER)
   @Post('assign-punctual')
-  assignPunctualPlan(@Body() body: AssignPunctualPlanDto) {
-    return this.purchasesService.assignPunctualPlan(body);
+  assignPunctualPlan(@Req() req: any, @Body() body: AssignPunctualPlanDto) {
+    return this.purchasesService.assignPunctualPlan(body, req.user.userId);
   }
 
   // Admin o entrenador: sustituir el plan activo por otro directamente
@@ -72,16 +72,16 @@ export class PurchasesController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN, Role.TRAINER)
   @Post('change')
-  changePlan(@Body() body: AssignPlanDto) {
-    return this.purchasesService.changePlan(body);
+  changePlan(@Req() req: any, @Body() body: AssignPlanDto) {
+    return this.purchasesService.changePlan(body, req.user.userId);
   }
 
   // Admin o entrenador: parar un plan asignado a mano en cualquier momento.
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN, Role.TRAINER)
   @Patch(':id/cancel')
-  cancel(@Param('id') id: string) {
-    return this.purchasesService.cancel(id);
+  cancel(@Req() req: any, @Param('id') id: string) {
+    return this.purchasesService.cancel(id, req.user.userId);
   }
 
   // Temporal, mientras se termina de verificar el flujo completo del webhook.
