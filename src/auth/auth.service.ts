@@ -26,7 +26,7 @@ export class AuthService {
     }
 
     if (user.status !== UserStatus.ACTIVE) {
-      throw new UnauthorizedException('Tu cuenta aún no ha sido aprobada');
+      throw new UnauthorizedException('Tu cuenta está inhabilitada');
     }
 
     // Por ahora la app solo es para admin y entrenadores; los clientes

@@ -24,7 +24,7 @@ export class UsersService {
       ...data,
       password: hashedPassword,
       roles: [Role.CLIENT],
-      status: UserStatus.PENDING,
+      status: UserStatus.ACTIVE,
     });
     return created.save();
   }
@@ -89,30 +89,6 @@ export class UsersService {
     .select('firstName lastName')
     .exec();
 }
-
-  async approve(id: string): Promise<User> {
-    const user = await this.userModel.findByIdAndUpdate(
-      id,
-      { status: UserStatus.ACTIVE },
-      { new: true },
-    );
-    if (!user) {
-      throw new NotFoundException(`User with id ${id} not found`);
-    }
-    return user;
-  }
-
-  async reject(id: string): Promise<User> {
-    const user = await this.userModel.findByIdAndUpdate(
-      id,
-      { status: UserStatus.REJECTED },
-      { new: true },
-    );
-    if (!user) {
-      throw new NotFoundException(`User with id ${id} not found`);
-    }
-    return user;
-  }
 
   async findByEmail(email: string): Promise<User | null> {
     return this.userModel.findOne({ email }).exec();

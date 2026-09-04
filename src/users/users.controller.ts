@@ -85,17 +85,4 @@ export class UsersController {
     return this.usersService.findOne(id);
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
-  @Patch(':id/approve')
-  approve(@Param('id') id: string) {
-    return this.usersService.approve(id);
-  }
-
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
-  @Patch(':id/reject')
-  reject(@Param('id') id: string) {
-    return this.usersService.reject(id);
-  }
 }

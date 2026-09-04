@@ -8,10 +8,8 @@ export enum Role {
 }
 
 export enum UserStatus {
-  PENDING = 'pending',
   ACTIVE = 'active',
   INACTIVE = 'inactive',
-  REJECTED = 'rejected',
 }
 
 @Schema({
@@ -53,7 +51,7 @@ export class User extends Document {
   @Prop({ type: [String], enum: Role, default: [Role.CLIENT] })
   roles!: Role[];
 
-  @Prop({ type: String, enum: UserStatus, default: UserStatus.PENDING })
+  @Prop({ type: String, enum: UserStatus, default: UserStatus.ACTIVE })
   status!: UserStatus;
 
   @Prop({ required: false })
