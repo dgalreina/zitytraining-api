@@ -71,8 +71,14 @@ export class UsersService {
   }
 }
 
-  async findAll(): Promise<User[]> {
-    return this.userModel.find().exec();
+  // Sin status: todos menos los eliminados (comportamiento de siempre).
+  // Con status: filtra por ese estado exacto (usado para la papelera,
+  // status=deleted, que a propósito no entra dentro de "todos").
+  async findAll(status?: UserStatus): Promise<User[]> {
+    if (status) {
+      return this.userModel.find({ status }).exec();
+    }
+    return this.userModel.find({ status: { $ne: UserStatus.DELETED } }).exec();
   }
 
   async findOne(id: string): Promise<User> {
@@ -83,10 +89,25 @@ export class UsersService {
     return user;
   }
 
+  // Borrado blando: no se elimina el documento, para no romper las
+  // referencias de compras/fichas de salud/progreso que apuntan a este
+  // id. Solo deja de aparecer en los listados (findAll ya lo excluye).
+  async remove(id: string): Promise<User> {
+    const user = await this.userModel.findByIdAndUpdate(
+      id,
+      { status: UserStatus.DELETED },
+      { new: true },
+    );
+    if (!user) {
+      throw new NotFoundException(`User with id ${id} not found`);
+    }
+    return user;
+  }
+
   async findActiveClients(): Promise<User[]> {
   return this.userModel
     .find({ roles: Role.CLIENT, status: UserStatus.ACTIVE })
-    .select('firstName lastName')
+    .select('firstName lastName status')
     .exec();
 }
 

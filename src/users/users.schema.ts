@@ -10,6 +10,10 @@ export enum Role {
 export enum UserStatus {
   ACTIVE = 'active',
   INACTIVE = 'inactive',
+  // Borrado "blando": no se toca el documento en si (los pagos, fichas
+  // de salud, etc. siguen apuntando a este id), solo deja de aparecer
+  // en los listados.
+  DELETED = 'deleted',
 }
 
 @Schema({

@@ -1,10 +1,12 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -17,7 +19,7 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { Role } from './users.schema';
+import { Role, UserStatus } from './users.schema';
 
 @Controller('users')
 export class UsersController {
@@ -71,11 +73,13 @@ export class UsersController {
     return this.usersService.update(id, body);
   }
 
+  // Sin query: todos menos los eliminados. ?status=deleted: solo los
+  // eliminados (para la papelera), aparte, no se mezcla con "todos".
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
   @Get()
-  findAll() {
-    return this.usersService.findAll();
+  findAll(@Query('status') status?: UserStatus) {
+    return this.usersService.findAll(status);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -85,4 +89,12 @@ export class UsersController {
     return this.usersService.findOne(id);
   }
 
+  // Borrado blando: deja de aparecer en los listados, pero no se toca
+  // el documento (compras, fichas de salud, etc. siguen intactas).
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @Delete(':id')
+  remove(@Param('id') id: string) {
+    return this.usersService.remove(id);
+  }
 }
