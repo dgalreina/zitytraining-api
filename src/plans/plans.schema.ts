@@ -12,11 +12,19 @@ export class Plan extends Document {
   @Prop({ type: String, enum: PlanCategory, required: true })
   category!: PlanCategory;
 
+  // Lo que introduce el admin. label/sessionPrice/sessionCount de abajo
+  // se recalculan solos a partir de esto, no se editan a mano.
   @Prop({ required: true })
-  label!: string; // ej. "2 días/sem · 1h"
+  sessionsPerWeek!: number;
+
+  @Prop({ required: true })
+  durationMinutes!: number;
 
   @Prop({ required: true })
   monthlyPrice!: number;
+
+  @Prop({ required: true })
+  label!: string; // ej. "2 días/sem · 1h"
 
   @Prop({ required: true })
   sessionPrice!: number;

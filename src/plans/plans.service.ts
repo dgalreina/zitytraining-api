@@ -5,12 +5,32 @@ import { Plan } from './plans.schema';
 import { CreatePlanDto } from './dto/create-plan.dto';
 import { UpdatePlanDto } from './dto/update-plan.dto';
 
+// 40' o 1h: solo se sale a horas exactas cuando cuadra, si no en minutos.
+function formatDuration(minutes: number): string {
+  if (minutes % 60 === 0) {
+    return `${minutes / 60}h`;
+  }
+  return `${minutes}'`;
+}
+
+// sessionCount y sessionPrice no los toca el admin a mano: se derivan
+// de sesiones/semana, duración y precio mensual (4 semanas al mes).
+function computeDerivedFields(sessionsPerWeek: number, durationMinutes: number, monthlyPrice: number) {
+  const sessionCount = sessionsPerWeek * 4;
+  const sessionPrice = Math.round((monthlyPrice / sessionCount) * 100) / 100;
+  const label = `${sessionsPerWeek} días/sem · ${formatDuration(durationMinutes)}`;
+  return { label, sessionPrice, sessionCount };
+}
+
 @Injectable()
 export class PlansService {
   constructor(@InjectModel(Plan.name) private planModel: Model<Plan>) {}
 
   async create(data: CreatePlanDto): Promise<Plan> {
-    const created = new this.planModel(data);
+    const created = new this.planModel({
+      ...data,
+      ...computeDerivedFields(data.sessionsPerWeek, data.durationMinutes, data.monthlyPrice),
+    });
     return created.save();
   }
 
@@ -19,11 +39,17 @@ export class PlansService {
   }
 
   async update(id: string, data: UpdatePlanDto): Promise<Plan> {
-    const updated = await this.planModel.findByIdAndUpdate(id, data, { new: true });
-    if (!updated) {
+    const existing = await this.planModel.findById(id);
+    if (!existing) {
       throw new NotFoundException(`Plan with id ${id} not found`);
     }
-    return updated;
+
+    const sessionsPerWeek = data.sessionsPerWeek ?? existing.sessionsPerWeek;
+    const durationMinutes = data.durationMinutes ?? existing.durationMinutes;
+    const monthlyPrice = data.monthlyPrice ?? existing.monthlyPrice;
+
+    Object.assign(existing, data, computeDerivedFields(sessionsPerWeek, durationMinutes, monthlyPrice));
+    return existing.save();
   }
 
   // Borrado normal (no blando): los planes ya asignados guardan su
