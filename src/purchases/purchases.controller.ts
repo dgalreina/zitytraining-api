@@ -11,6 +11,8 @@ import {
 } from '@nestjs/common';
 import { PurchasesService } from './purchases.service';
 import { CreatePurchaseDto } from './dto/create-purchase.dto';
+import { AssignPlanDto } from './dto/assign-plan.dto';
+import { AssignPunctualPlanDto } from './dto/assign-punctual-plan.dto';
 import { PurchaseStatus } from './purchases.schema';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -45,6 +47,41 @@ export class PurchasesController {
   @Get('client/:id')
   findByClient(@Param('id') id: string) {
     return this.purchasesService.findByClient(id);
+  }
+
+  // Admin o entrenador: asignar un plan directamente a un cliente
+  // (pagado en mano, sin Stripe).
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.TRAINER)
+  @Post('assign')
+  assignPlan(@Body() body: AssignPlanDto) {
+    return this.purchasesService.assignPlan(body);
+  }
+
+  // Admin o entrenador: plan puntual con fecha de fin; pausa el plan
+  // activo del cliente mientras dura y lo retoma al acabar.
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.TRAINER)
+  @Post('assign-punctual')
+  assignPunctualPlan(@Body() body: AssignPunctualPlanDto) {
+    return this.purchasesService.assignPunctualPlan(body);
+  }
+
+  // Admin o entrenador: sustituir el plan activo por otro directamente
+  // (definitivo, no se retoma el anterior).
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.TRAINER)
+  @Post('change')
+  changePlan(@Body() body: AssignPlanDto) {
+    return this.purchasesService.changePlan(body);
+  }
+
+  // Admin o entrenador: parar un plan asignado a mano en cualquier momento.
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.TRAINER)
+  @Patch(':id/cancel')
+  cancel(@Param('id') id: string) {
+    return this.purchasesService.cancel(id);
   }
 
   // Temporal, mientras se termina de verificar el flujo completo del webhook.

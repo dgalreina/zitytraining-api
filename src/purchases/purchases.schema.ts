@@ -15,6 +15,9 @@ export enum PaymentMode {
 export enum PurchaseStatus {
   PENDING = 'pending',
   ACTIVE = 'active',
+  // El plan "de fondo" mientras hay un plan puntual corriendo por encima.
+  // No es lo mismo que cancelado: se retoma solo cuando el puntual acaba.
+  PAUSED = 'paused',
   CANCELLED = 'cancelled',
   COMPLETED = 'completed',
 }
@@ -47,6 +50,26 @@ export class Purchase extends Document {
 
   @Prop({ required: false })
   activatedAt?: Date; // fecha en la que el estado pasó a "active"
+
+  @Prop({ required: false })
+  endedAt?: Date; // fecha en la que se paró (solo planes asignados a mano, sin Stripe)
+
+  // Asignado por un entrenador/admin y pagado en mano, sin pasar por
+  // Stripe. Importa para no dejar "parar" desde la app un plan que en
+  // realidad sigue cobrando por Stripe (aquí se pararía solo en la BD).
+  @Prop({ default: false })
+  assignedInPerson!: boolean;
+
+  // Solo en planes puntuales (con fecha de fin conocida de antemano, a
+  // diferencia de una suscripción normal). Cuando esta fecha pasa, este
+  // plan se cierra solo y se retoma el que pausó (si había alguno).
+  @Prop({ required: false })
+  scheduledEndDate?: Date;
+
+  // Si este plan puntual pausó otro plan al empezar, aquí se guarda cuál,
+  // para saber a cuál volver cuando el puntual termine.
+  @Prop({ type: Types.ObjectId, ref: 'Purchase', required: false })
+  pausedPlan?: Types.ObjectId;
 }
 
 export const PurchaseSchema = SchemaFactory.createForClass(Purchase);
