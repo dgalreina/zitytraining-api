@@ -92,7 +92,14 @@ export class UsersService {
   // Borrado blando: no se elimina el documento, para no romper las
   // referencias de compras/fichas de salud/progreso que apuntan a este
   // id. Solo deja de aparecer en los listados (findAll ya lo excluye).
-  async remove(id: string): Promise<User> {
+  async remove(id: string, actorId: string): Promise<User> {
+    if (id === actorId) {
+      // Si un admin se borrara a si mismo, su propia sesion dejaria de
+      // ser valida a mitad de la request (el guard revisa el status en
+      // cada peticion): mejor cortarlo aqui con un mensaje claro.
+      throw new BadRequestException('No puedes eliminar tu propia cuenta');
+    }
+
     const user = await this.userModel.findByIdAndUpdate(
       id,
       { status: UserStatus.DELETED },
