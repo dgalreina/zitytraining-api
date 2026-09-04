@@ -35,7 +35,13 @@ export class PlansService {
   }
 
   async findAll(): Promise<Plan[]> {
-    return this.planModel.find().sort({ category: 1, monthlyPrice: 1 }).exec();
+    // Dentro de cada categoria: primero por sesiones/semana (2, 3, 4...),
+    // y dentro de las mismas sesiones/semana, la duracion mas larga
+    // primero (1h antes que 40').
+    return this.planModel
+      .find()
+      .sort({ category: 1, sessionsPerWeek: 1, durationMinutes: -1 })
+      .exec();
   }
 
   async update(id: string, data: UpdatePlanDto): Promise<Plan> {
