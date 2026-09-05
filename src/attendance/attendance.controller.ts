@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { AttendanceService } from './attendance.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -41,7 +41,7 @@ export class AttendanceController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
   @Get()
-  findAll() {
-    return this.attendanceService.findAll();
+  findAll(@Query('from') from?: string, @Query('to') to?: string) {
+    return this.attendanceService.findAll(from, to);
   }
 }

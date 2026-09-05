@@ -68,11 +68,22 @@ export class AttendanceService {
     return this.timeEntryModel.find({ trainer: trainerId }).sort({ clockIn: -1 }).exec();
   }
 
-  // Para el admin: todos los fichajes de todos los entrenadores.
-  async findAll(): Promise<TimeEntry[]> {
+  // Para el admin: todos los fichajes de todos los entrenadores. from/to
+  // acotan por clockIn (para pedir solo la semana visible en el
+  // calendario, en vez de todo el historico).
+  async findAll(from?: string, to?: string): Promise<TimeEntry[]> {
     await this.resolveForgottenClockOuts();
+
+    const filter: Record<string, unknown> = {};
+    if (from || to) {
+      const clockIn: Record<string, Date> = {};
+      if (from) clockIn.$gte = new Date(from);
+      if (to) clockIn.$lte = new Date(to);
+      filter.clockIn = clockIn;
+    }
+
     return this.timeEntryModel
-      .find()
+      .find(filter)
       .sort({ clockIn: -1 })
       .populate('trainer', 'firstName lastName color')
       .exec();
