@@ -3,6 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Workout } from './workouts.schema';
 import { CreateWorkoutDto } from './dto/create-workout.dto';
+import { UpdateWorkoutDto } from './dto/update-workout.dto';
 
 @Injectable()
 export class WorkoutsService {
@@ -20,6 +21,28 @@ export class WorkoutsService {
       })),
     });
     return created.save();
+  }
+
+  async update(id: string, data: UpdateWorkoutDto): Promise<Workout> {
+    const existing = await this.workoutModel.findById(id);
+    if (!existing) {
+      throw new NotFoundException(`Workout with id ${id} not found`);
+    }
+
+    if (data.name !== undefined) {
+      existing.name = data.name;
+    }
+    if (data.slots !== undefined) {
+      existing.slots = data.slots.map((slot) => ({
+        exercise: slot.exerciseId,
+        reps: slot.reps || [],
+        supersetGroup: slot.supersetGroup,
+        restPause: slot.restPause || false,
+        notes: slot.notes,
+      })) as any;
+    }
+
+    return existing.save();
   }
 
   async findAll(): Promise<Workout[]> {
