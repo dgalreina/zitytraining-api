@@ -23,4 +23,9 @@ export class CreateBookingDto {
   @IsOptional()
   @IsBoolean()
   isPrivate?: boolean;
+
+  // null explicito quita el entrenamiento asignado; omitido no lo toca.
+  @IsOptional()
+  @IsMongoId()
+  workoutId?: string | null;
 }

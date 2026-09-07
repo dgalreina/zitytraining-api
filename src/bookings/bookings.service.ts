@@ -10,11 +10,19 @@ import { Booking } from './bookings.schema';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { UpdateBookingDto } from './dto/update-booking.dto';
 
+// Un solo nivel de populate no basta: dentro del workout hace falta el
+// nombre/categoria de cada ejercicio para poder pintarlo (icono, etc.)
+const WORKOUT_POPULATE = {
+  path: 'workout',
+  populate: { path: 'slots.exercise', select: 'name category' },
+};
+
 @Injectable()
 export class BookingsService {
   constructor(@InjectModel(Booking.name) private bookingModel: Model<Booking>) {}
 
   async create(data: CreateBookingDto): Promise<Booking> {
+    const { workoutId, ...rest } = data;
     const startTime = new Date(data.startTime);
     const endTime = new Date(data.endTime);
     const clients = data.clients ?? [];
@@ -24,10 +32,11 @@ export class BookingsService {
     }
 
     const created = new this.bookingModel({
-      ...data,
+      ...rest,
       clients,
       startTime,
       endTime,
+      workout: workoutId || undefined,
     });
     return created.save();
   }
@@ -47,7 +56,11 @@ export class BookingsService {
     if (trainerId !== requestingUserId) {
       query.isPrivate = { $ne: true };
     }
-    return this.bookingModel.find(query).populate('clients', 'firstName lastName').exec();
+    return this.bookingModel
+      .find(query)
+      .populate('clients', 'firstName lastName')
+      .populate(WORKOUT_POPULATE)
+      .exec();
   }
 
   // Varios entrenadores a la vez (de 1 a N), para el filtro tipo checklist
@@ -69,6 +82,7 @@ export class BookingsService {
       })
       .populate('trainer', 'firstName lastName color')
       .populate('clients', 'firstName lastName')
+      .populate(WORKOUT_POPULATE)
       .exec();
   }
 
@@ -85,6 +99,7 @@ export class BookingsService {
       })
       .populate('trainer', 'firstName lastName color')
       .populate('clients', 'firstName lastName')
+      .populate(WORKOUT_POPULATE)
       .exec();
   }
 
@@ -102,6 +117,7 @@ export class BookingsService {
       })
       .populate('trainer', 'firstName lastName color')
       .populate('clients', 'firstName lastName')
+      .populate(WORKOUT_POPULATE)
       .exec();
   }
 
@@ -121,11 +137,20 @@ export class BookingsService {
       throw new ConflictException('La hora de fin debe ser posterior a la de inicio');
     }
 
-    const updated = await this.bookingModel.findByIdAndUpdate(
-      id,
-      { ...data, startTime, endTime },
-      { new: true },
-    );
+    // workoutId no forma parte del schema (el campo se llama "workout");
+    // se traduce aparte. undefined = no tocar, null o id = reemplazar.
+    const { workoutId, ...rest } = data;
+    const updatePayload: Record<string, unknown> = { ...rest, startTime, endTime };
+    if (workoutId !== undefined) {
+      updatePayload.workout = workoutId;
+    }
+
+    const updated = await this.bookingModel
+      .findByIdAndUpdate(id, updatePayload, { new: true })
+      .populate('trainer', 'firstName lastName color')
+      .populate('clients', 'firstName lastName')
+      .populate(WORKOUT_POPULATE)
+      .exec();
     return updated!;
   }
 

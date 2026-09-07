@@ -31,6 +31,11 @@ export class Booking extends Document {
   // puede cancelar, solo borrar.
   @Prop({ type: Boolean, default: false })
   isPrivate!: boolean;
+
+  // Entrenamiento asignado a esta sesion (opcional). Uno solo por sesion,
+  // compartido por todos sus clientes si es dueto/trio.
+  @Prop({ type: Types.ObjectId, ref: 'Workout', required: false })
+  workout?: Types.ObjectId;
 }
 
 export const BookingSchema = SchemaFactory.createForClass(Booking);
