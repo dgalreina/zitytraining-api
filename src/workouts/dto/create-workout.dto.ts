@@ -21,8 +21,8 @@ class WorkoutSlotDto {
   reps?: number[];
 
   @IsOptional()
-  @IsString()
-  supersetGroup?: string;
+  @IsBoolean()
+  linkedToNext?: boolean;
 
   @IsOptional()
   @IsBoolean()

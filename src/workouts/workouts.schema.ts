@@ -12,10 +12,12 @@ export class WorkoutSlot {
   @Prop({ type: [Number], default: [] })
   reps!: number[];
 
-  // Superserie: los slots consecutivos que comparten este valor se
-  // agrupan y numeran como 1a, 1b, 1c... en vez de ir cada uno aparte.
-  @Prop({ required: false })
-  supersetGroup?: string;
+  // Superserie: marca que este ejercicio va encadenado con el
+  // siguiente de la lista (se numeran juntos como 1a, 1b, 1c...).
+  // Apagarlo en cualquiera de la cadena solo rompe el enlace con el
+  // siguiente; el resto de la cadena sigue intacta.
+  @Prop({ default: false })
+  linkedToNext!: boolean;
 
   // Solo una marca visual ("RP"), sin campos adicionales.
   @Prop({ default: false })

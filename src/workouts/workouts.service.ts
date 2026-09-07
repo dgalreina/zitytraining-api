@@ -15,7 +15,7 @@ export class WorkoutsService {
       slots: data.slots.map((slot) => ({
         exercise: slot.exerciseId,
         reps: slot.reps || [],
-        supersetGroup: slot.supersetGroup,
+        linkedToNext: slot.linkedToNext || false,
         restPause: slot.restPause || false,
         notes: slot.notes,
       })),
@@ -36,7 +36,7 @@ export class WorkoutsService {
       existing.slots = data.slots.map((slot) => ({
         exercise: slot.exerciseId,
         reps: slot.reps || [],
-        supersetGroup: slot.supersetGroup,
+        linkedToNext: slot.linkedToNext || false,
         restPause: slot.restPause || false,
         notes: slot.notes,
       })) as any;
