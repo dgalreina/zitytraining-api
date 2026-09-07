@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Exercise } from './exercises.schema';
@@ -47,6 +47,9 @@ export class ExercisesService {
     if (!existing) {
       throw new NotFoundException(`Exercise with id ${id} not found`);
     }
+    if (existing.locked) {
+      throw new ForbiddenException('Este ejercicio es del catálogo base y no se puede editar');
+    }
     existing.name = name.trim();
     return existing.save();
   }
@@ -55,9 +58,13 @@ export class ExercisesService {
   // slot se queda sin referencia valida (se muestra como "eliminado" en
   // el frontend), igual que pasa con los planes borrados del catalogo.
   async remove(id: string): Promise<void> {
-    const deleted = await this.exerciseModel.findByIdAndDelete(id);
-    if (!deleted) {
+    const existing = await this.exerciseModel.findById(id);
+    if (!existing) {
       throw new NotFoundException(`Exercise with id ${id} not found`);
     }
+    if (existing.locked) {
+      throw new ForbiddenException('Este ejercicio es del catálogo base y no se puede eliminar');
+    }
+    await existing.deleteOne();
   }
 }
