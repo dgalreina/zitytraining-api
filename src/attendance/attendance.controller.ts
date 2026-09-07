@@ -1,5 +1,6 @@
-import { Controller, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { AttendanceService } from './attendance.service';
+import { CreateManualEntryDto } from './dto/create-manual-entry.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -21,6 +22,14 @@ export class AttendanceController {
   @Post('clock-out')
   clockOut(@Req() req: any) {
     return this.attendanceService.clockOut(req.user.userId);
+  }
+
+  // Fichaje a mano, por si se olvidó fichar en su momento.
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.TRAINER)
+  @Post('manual')
+  createManual(@Req() req: any, @Body() body: CreateManualEntryDto) {
+    return this.attendanceService.createManual(req.user.userId, body.clockIn, body.clockOut);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

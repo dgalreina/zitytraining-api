@@ -18,6 +18,11 @@ export class TimeEntry extends Document {
   // ese mismo día (ver resolveForgottenClockOuts en el service).
   @Prop({ default: false })
   autoClockedOut!: boolean;
+
+  // Añadido a mano por el propio entrenador porque se le olvidó fichar
+  // en su momento (entrada y salida ya cerradas, no un fichaje en curso).
+  @Prop({ default: false })
+  manual!: boolean;
 }
 
 export const TimeEntrySchema = SchemaFactory.createForClass(TimeEntry);
