@@ -11,6 +11,8 @@ import { HealthFormsModule } from './health-forms/health-forms.module';
 import { ProgressModule } from './progress/progress.module';
 import { PlansModule } from './plans/plans.module';
 import { AttendanceModule } from './attendance/attendance.module';
+import { ExercisesModule } from './exercises/exercises.module';
+import { WorkoutsModule } from './workouts/workouts.module';
 
 @Module({
   imports: [
@@ -29,7 +31,9 @@ import { AttendanceModule } from './attendance/attendance.module';
     HealthFormsModule,
     ProgressModule,
     PlansModule,
-    AttendanceModule
+    AttendanceModule,
+    ExercisesModule,
+    WorkoutsModule
   ],
   controllers: [AppController],
   providers: [AppService],
