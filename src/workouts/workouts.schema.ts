@@ -7,9 +7,22 @@ export class WorkoutSlot {
   exercise!: Types.ObjectId;
 
   // Una entrada por serie (ej. [12, 12, 10, 8]), no un numero unico:
-  // cada serie puede tener sus propias repeticiones.
-  @Prop({ type: [Number], required: true })
+  // cada serie puede tener sus propias repeticiones. No es obligatorio
+  // rellenarlas (ej. un ejercicio a rest-pause puede no llevar numero).
+  @Prop({ type: [Number], default: [] })
   reps!: number[];
+
+  // Superserie: los slots consecutivos que comparten este valor se
+  // agrupan y numeran como 1a, 1b, 1c... en vez de ir cada uno aparte.
+  @Prop({ required: false })
+  supersetGroup?: string;
+
+  // Solo una marca visual ("RP"), sin campos adicionales.
+  @Prop({ default: false })
+  restPause!: boolean;
+
+  @Prop({ required: false, trim: true })
+  notes?: string;
 }
 
 export const WorkoutSlotSchema = SchemaFactory.createForClass(WorkoutSlot);

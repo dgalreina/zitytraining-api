@@ -11,7 +11,13 @@ export class WorkoutsService {
   async create(data: CreateWorkoutDto): Promise<Workout> {
     const created = new this.workoutModel({
       name: data.name,
-      slots: data.slots.map((slot) => ({ exercise: slot.exerciseId, reps: slot.reps })),
+      slots: data.slots.map((slot) => ({
+        exercise: slot.exerciseId,
+        reps: slot.reps || [],
+        supersetGroup: slot.supersetGroup,
+        restPause: slot.restPause || false,
+        notes: slot.notes,
+      })),
     });
     return created.save();
   }

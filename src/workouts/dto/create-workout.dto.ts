@@ -2,11 +2,12 @@ import { Type } from 'class-transformer';
 import {
   ArrayMinSize,
   IsArray,
+  IsBoolean,
   IsMongoId,
   IsNotEmpty,
   IsNumber,
+  IsOptional,
   IsString,
-  Min,
   ValidateNested,
 } from 'class-validator';
 
@@ -14,11 +15,22 @@ class WorkoutSlotDto {
   @IsMongoId()
   exerciseId!: string;
 
+  @IsOptional()
   @IsArray()
-  @ArrayMinSize(1)
   @IsNumber({}, { each: true })
-  @Min(1, { each: true })
-  reps!: number[];
+  reps?: number[];
+
+  @IsOptional()
+  @IsString()
+  supersetGroup?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  restPause?: boolean;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
 }
 
 export class CreateWorkoutDto {
