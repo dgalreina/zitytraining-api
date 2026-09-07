@@ -27,14 +27,14 @@ export class ExercisesController {
   @Roles(Role.ADMIN, Role.TRAINER)
   @Post()
   create(@Body() body: CreateExerciseDto) {
-    return this.exercisesService.findOrCreate(body.name);
+    return this.exercisesService.findOrCreate(body.name, body.category);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN, Role.TRAINER)
   @Patch(':id')
   update(@Param('id') id: string, @Body() body: UpdateExerciseDto) {
-    return this.exercisesService.update(id, body.name!);
+    return this.exercisesService.update(id, body.name!, body.category);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

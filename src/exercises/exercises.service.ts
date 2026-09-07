@@ -1,7 +1,7 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { Exercise } from './exercises.schema';
+import { Exercise, ExerciseCategory } from './exercises.schema';
 
 function escapeRegex(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -24,15 +24,16 @@ export class ExercisesService {
   }
 
   // Si ya existe uno con el mismo nombre (sin distinguir mayusculas) se
-  // reutiliza en vez de crear un duplicado.
-  async findOrCreate(name: string): Promise<Exercise> {
+  // reutiliza en vez de crear un duplicado. Sin categoria (ej. creado al
+  // vuelo desde un entrenamiento) cae en OTROS, reclasificable despues.
+  async findOrCreate(name: string, category?: ExerciseCategory): Promise<Exercise> {
     const trimmed = name.trim();
     const existing = await this.exerciseModel.findOne({
       name: { $regex: `^${escapeRegex(trimmed)}$`, $options: 'i' },
     });
     if (existing) return existing;
 
-    const created = new this.exerciseModel({ name: trimmed });
+    const created = new this.exerciseModel({ name: trimmed, category });
     return created.save();
   }
 
@@ -42,7 +43,7 @@ export class ExercisesService {
     return this.exerciseModel.find().sort({ name: 1 }).exec();
   }
 
-  async update(id: string, name: string): Promise<Exercise> {
+  async update(id: string, name: string, category?: ExerciseCategory): Promise<Exercise> {
     const existing = await this.exerciseModel.findById(id);
     if (!existing) {
       throw new NotFoundException(`Exercise with id ${id} not found`);
@@ -51,6 +52,7 @@ export class ExercisesService {
       throw new ForbiddenException('Este ejercicio es del catálogo base y no se puede editar');
     }
     existing.name = name.trim();
+    if (category) existing.category = category;
     return existing.save();
   }
 
