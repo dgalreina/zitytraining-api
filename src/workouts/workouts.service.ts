@@ -20,7 +20,7 @@ export class WorkoutsService {
     return this.workoutModel
       .find()
       .sort({ createdAt: -1 })
-      .populate('slots.exercise', 'name')
+      .populate('slots.exercise', 'name category')
       .exec();
   }
 
