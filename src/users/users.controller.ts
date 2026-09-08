@@ -61,8 +61,22 @@ export class UsersController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.TRAINER, Role.ADMIN)
   @Get('clients')
-  listActiveClients() {
-    return this.usersService.findActiveClients();
+  listActiveClients(@Req() req: any) {
+    return this.usersService.findActiveClients(req.user.userId);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.TRAINER, Role.ADMIN)
+  @Post('clients/:clientId/favorite')
+  addFavoriteClient(@Req() req: any, @Param('clientId') clientId: string) {
+    return this.usersService.addFavoriteClient(req.user.userId, clientId);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.TRAINER, Role.ADMIN)
+  @Delete('clients/:clientId/favorite')
+  removeFavoriteClient(@Req() req: any, @Param('clientId') clientId: string) {
+    return this.usersService.removeFavoriteClient(req.user.userId, clientId);
   }
   // --- Fin lista de clientes activos ---
 
@@ -78,8 +92,8 @@ export class UsersController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
   @Get()
-  findAll(@Query('status') status?: UserStatus) {
-    return this.usersService.findAll(status);
+  findAll(@Req() req: any, @Query('status') status?: UserStatus) {
+    return this.usersService.findAll(status, req.user.userId);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

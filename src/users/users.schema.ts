@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Document, Types } from 'mongoose';
 
 export enum Role {
   ADMIN = 'admin',
@@ -60,6 +60,11 @@ export class User extends Document {
 
   @Prop({ required: false })
   color?: string; // color asignado al entrenador, ej. '#6aa842'
+
+  // Clientes que este entrenador ha marcado como favoritos (cada
+  // entrenador tiene su propia lista, no es un flag global del cliente).
+  @Prop({ type: [{ type: Types.ObjectId, ref: 'User' }], default: [] })
+  favoriteClients?: Types.ObjectId[];
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

@@ -74,11 +74,26 @@ export class UsersService {
   // Sin status: todos menos los eliminados (comportamiento de siempre).
   // Con status: filtra por ese estado exacto (usado para la papelera,
   // status=deleted, que a propósito no entra dentro de "todos").
-  async findAll(status?: UserStatus): Promise<User[]> {
-    if (status) {
-      return this.userModel.find({ status }).exec();
-    }
-    return this.userModel.find({ status: { $ne: UserStatus.DELETED } }).exec();
+  // requesterId: para marcar isFavorite según los favoritos de quien
+  // pregunta (la página de Clientes, en su vista de admin, la usa para
+  // esto). Solo tiene sentido en los clientes de la lista, pero no
+  // molesta marcarlo en el resto.
+  async findAll(status?: UserStatus, requesterId?: string): Promise<any[]> {
+    const query = status ? { status } : { status: { $ne: UserStatus.DELETED } };
+    const users = await this.userModel.find(query).lean().exec();
+
+    if (!requesterId) return users;
+
+    const requester = await this.userModel
+      .findById(requesterId)
+      .select('favoriteClients')
+      .lean()
+      .exec();
+    const favoriteIds = new Set(
+      (requester?.favoriteClients || []).map((id) => id.toString()),
+    );
+
+    return users.map((u) => ({ ...u, isFavorite: favoriteIds.has(u._id.toString()) }));
   }
 
   async findOne(id: string): Promise<User> {
@@ -111,12 +126,46 @@ export class UsersService {
     return user;
   }
 
-  async findActiveClients(): Promise<User[]> {
-  return this.userModel
-    .find({ roles: Role.CLIENT, status: UserStatus.ACTIVE })
-    .select('firstName lastName status')
-    .exec();
-}
+  // Los favoritos son por entrenador (cada uno tiene su propia lista), así
+  // que hace falta saber quién pregunta para marcar/ordenar sus favoritos.
+  async findActiveClients(trainerId: string): Promise<any[]> {
+    const [clients, trainer] = await Promise.all([
+      this.userModel
+        .find({ roles: Role.CLIENT, status: UserStatus.ACTIVE })
+        .select('firstName lastName status')
+        .lean()
+        .exec(),
+      this.userModel.findById(trainerId).select('favoriteClients').lean().exec(),
+    ]);
+
+    const favoriteIds = new Set(
+      (trainer?.favoriteClients || []).map((id) => id.toString()),
+    );
+
+    return clients
+      .map((c) => ({ ...c, isFavorite: favoriteIds.has(c._id.toString()) }))
+      .sort((a, b) => {
+        if (a.isFavorite !== b.isFavorite) return a.isFavorite ? -1 : 1;
+        return `${a.firstName} ${a.lastName}`.localeCompare(
+          `${b.firstName} ${b.lastName}`,
+          'es',
+        );
+      });
+  }
+
+  async addFavoriteClient(trainerId: string, clientId: string): Promise<{ success: true }> {
+    await this.userModel.findByIdAndUpdate(trainerId, {
+      $addToSet: { favoriteClients: clientId },
+    });
+    return { success: true };
+  }
+
+  async removeFavoriteClient(trainerId: string, clientId: string): Promise<{ success: true }> {
+    await this.userModel.findByIdAndUpdate(trainerId, {
+      $pull: { favoriteClients: clientId },
+    });
+    return { success: true };
+  }
 
   async findByEmail(email: string): Promise<User | null> {
     return this.userModel.findOne({ email }).exec();
