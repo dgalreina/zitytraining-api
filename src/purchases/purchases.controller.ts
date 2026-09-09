@@ -13,6 +13,7 @@ import { PurchasesService } from './purchases.service';
 import { CreatePurchaseDto } from './dto/create-purchase.dto';
 import { AssignPlanDto } from './dto/assign-plan.dto';
 import { AssignPunctualPlanDto } from './dto/assign-punctual-plan.dto';
+import { UpdatePurchaseDatesDto } from './dto/update-purchase-dates.dto';
 import { PurchaseStatus } from './purchases.schema';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -82,6 +83,15 @@ export class PurchasesController {
   @Patch(':id/cancel')
   cancel(@Req() req: any, @Param('id') id: string) {
     return this.purchasesService.cancel(id, req.user.userId);
+  }
+
+  // Admin o entrenador: corregir la fecha de inicio/fin de un plan
+  // asignado a mano, por si se introdujo mal.
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.TRAINER)
+  @Patch(':id/dates')
+  updateDates(@Req() req: any, @Param('id') id: string, @Body() body: UpdatePurchaseDatesDto) {
+    return this.purchasesService.updateDates(id, body, req.user.userId);
   }
 
   // Temporal, mientras se termina de verificar el flujo completo del webhook.

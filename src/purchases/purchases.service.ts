@@ -7,6 +7,7 @@ import { Purchase, PurchaseStatus, PurchaseType, PaymentMode } from './purchases
 import { CreatePurchaseDto } from './dto/create-purchase.dto';
 import { AssignPlanDto } from './dto/assign-plan.dto';
 import { AssignPunctualPlanDto } from './dto/assign-punctual-plan.dto';
+import { UpdatePurchaseDatesDto } from './dto/update-purchase-dates.dto';
 
 @Injectable()
 export class PurchasesService {
@@ -147,6 +148,30 @@ export class PurchasesService {
       });
     }
 
+    return existing;
+  }
+
+  // Corrige la fecha de inicio (y, si es puntual, la de fin) de un plan
+  // asignado a mano, por si se introdujo mal. Igual que "cancel", no vale
+  // para planes pagados por Stripe: esas fechas las marca el propio pago.
+  async updateDates(id: string, data: UpdatePurchaseDatesDto, actorId: string): Promise<Purchase> {
+    const existing = await this.purchaseModel.findById(id);
+    if (!existing) {
+      throw new NotFoundException(`Purchase with id ${id} not found`);
+    }
+    if (!existing.assignedInPerson) {
+      throw new BadRequestException(
+        'Este plan se pagó por Stripe, no se pueden editar sus fechas desde aquí',
+      );
+    }
+
+    if (data.startDate) {
+      existing.activatedAt = new Date(data.startDate);
+    }
+    if (data.endDate) {
+      existing.scheduledEndDate = new Date(data.endDate);
+    }
+    await existing.save();
     return existing;
   }
 
