@@ -20,4 +20,8 @@ export class AssignPlanDto {
   @IsOptional()
   @IsDateString()
   startDate?: string;
+
+  @IsOptional()
+  @IsNumber()
+  sessionCount?: number;
 }

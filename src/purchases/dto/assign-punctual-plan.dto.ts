@@ -22,4 +22,8 @@ export class AssignPunctualPlanDto {
 
   @IsDateString()
   endDate!: string;
+
+  @IsOptional()
+  @IsNumber()
+  sessionCount?: number;
 }
