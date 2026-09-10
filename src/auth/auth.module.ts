@@ -17,11 +17,10 @@ import { RefreshToken, RefreshTokenSchema } from './refresh-token.schema';
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
         secret: configService.get<string>('JWT_SECRET'),
-        // TODO: TEMPORAL para forzar el refresco y probarlo en real, volver
-        // a '15m' en cuanto se confirme que funciona. La sesión de verdad la
-        // sostiene el refresh token (30 días, ver refresh-token.schema.ts),
-        // que se renueva solo desde el frontend sin pedir contraseña de nuevo.
-        signOptions: { expiresIn: '20s' },
+        // La sesión de verdad la sostiene el refresh token (30 días, ver
+        // refresh-token.schema.ts), que se renueva solo desde el frontend
+        // sin pedir contraseña de nuevo.
+        signOptions: { expiresIn: '15m' },
       }),
     }),
   ],
