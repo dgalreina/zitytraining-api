@@ -1,4 +1,4 @@
-import { IsEnum, IsOptional } from 'class-validator';
+import { IsBoolean, IsEnum, IsOptional } from 'class-validator';
 import { PartialType } from '@nestjs/mapped-types';
 import { CreateBookingDto } from './create-booking.dto';
 import { BookingStatus } from '../bookings.schema';
@@ -10,4 +10,10 @@ export class UpdateBookingDto extends PartialType(CreateBookingDto) {
   @IsOptional()
   @IsEnum(BookingStatus)
   status?: BookingStatus;
+
+  // Para desmarcar (o volver a marcar) que esta sesión concreta de una
+  // serie no cuenta como dada por caer en festivo.
+  @IsOptional()
+  @IsBoolean()
+  holidaySkip?: boolean;
 }

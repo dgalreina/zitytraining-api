@@ -3,6 +3,7 @@ import {
   IsArray,
   IsBoolean,
   IsDateString,
+  IsIn,
   IsMongoId,
   IsOptional,
   IsString,
@@ -13,8 +14,7 @@ export class CreateBookingDto {
   trainer!: string;
 
   // Vacio (u omitido) en sesiones privadas: no llevan clientes. Si no,
-  // el primero es el cliente principal (a quien se le hace el cobro) y
-  // hasta 2 más son acompañantes.
+  // hasta 3 clientes, sin distinguir uno "principal" de los demás.
   @IsOptional()
   @IsArray()
   @ArrayMaxSize(3)
@@ -39,4 +39,11 @@ export class CreateBookingDto {
   @IsOptional()
   @IsMongoId()
   workoutId?: string | null;
+
+  // Omitido o "once": sesión puntual normal. "weekly": crea una serie que
+  // se repite cada semana a esta misma hora, para siempre (hasta que se
+  // pare a mano borrando "esta sesión y las futuras").
+  @IsOptional()
+  @IsIn(['once', 'weekly'])
+  recurrence?: 'once' | 'weekly';
 }

@@ -105,4 +105,13 @@ export class BookingsController {
   remove(@Req() req: any, @Param('id') id: string) {
     return this.bookingsService.remove(id, req.user.userId);
   }
+
+  // Borra esta sesión y todas las futuras de su serie (el pasado no se
+  // toca). Si la sesión no pertenece a ninguna serie, borra solo esta.
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN, Role.TRAINER)
+  @Delete(':id/series')
+  removeSeries(@Req() req: any, @Param('id') id: string) {
+    return this.bookingsService.removeSeriesFrom(id, req.user.userId);
+  }
 }

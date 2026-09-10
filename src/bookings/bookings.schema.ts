@@ -36,6 +36,17 @@ export class Booking extends Document {
   // compartido por todos sus clientes si es dueto/trio.
   @Prop({ type: Types.ObjectId, ref: 'Workout', required: false })
   workout?: Types.ObjectId;
+
+  // Si esta sesion viene de una serie semanal (ver BookingSeries), aqui
+  // se guarda cual. Sin valor: sesion puntual normal.
+  @Prop({ type: Types.ObjectId, ref: 'BookingSeries', required: false })
+  series?: Types.ObjectId;
+
+  // Para sesiones de una serie que caen en festivo: no cuenta como
+  // sesion dada (de cara a Contabilidad), pero se puede desmarcar a mano
+  // por si esa clase concreta sí se dio pese al festivo.
+  @Prop({ type: Boolean, default: false })
+  holidaySkip!: boolean;
 }
 
 export const BookingSchema = SchemaFactory.createForClass(Booking);
