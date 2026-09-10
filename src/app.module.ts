@@ -13,6 +13,7 @@ import { PlansModule } from './plans/plans.module';
 import { AttendanceModule } from './attendance/attendance.module';
 import { ExercisesModule } from './exercises/exercises.module';
 import { WorkoutsModule } from './workouts/workouts.module';
+import { HolidaysModule } from './holidays/holidays.module';
 
 @Module({
   imports: [
@@ -33,7 +34,8 @@ import { WorkoutsModule } from './workouts/workouts.module';
     PlansModule,
     AttendanceModule,
     ExercisesModule,
-    WorkoutsModule
+    WorkoutsModule,
+    HolidaysModule
   ],
   controllers: [AppController],
   providers: [AppService],
