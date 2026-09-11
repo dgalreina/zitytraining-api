@@ -72,11 +72,16 @@ export class AccountingService {
   ) {
     const clientId = (client._id as any).toString();
 
+    // PAUSED se excluye a propósito: mientras un plan está en pausa, es un
+    // puntual el que cubre ese periodo (ver purchases.service.ts). Sin
+    // fecha de fin propia, un pausado sin excluir se contaría como si
+    // siguiera cubriendo el mes entero, duplicando el cobro con el
+    // puntual que sí está activo de verdad.
     const purchases = await this.purchaseModel
       .find({
         client: clientId,
         type: PurchaseType.PLAN,
-        status: { $ne: PurchaseStatus.PENDING },
+        status: { $nin: [PurchaseStatus.PENDING, PurchaseStatus.PAUSED] },
       })
       .exec();
 
