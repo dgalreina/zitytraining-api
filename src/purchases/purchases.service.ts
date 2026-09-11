@@ -54,6 +54,17 @@ export class PurchasesService {
   // retoma solo (sin cambiar su fecha de inicio original) cuando el
   // puntual acaba, ya sea por caducar o por pararlo a mano.
   async assignPunctualPlan(data: AssignPunctualPlanDto, actorId: string): Promise<Purchase> {
+    // Un puntual tiene un precio único para todo su periodo: si cruzara
+    // de un mes a otro, no habría forma de saber qué parte de ese precio
+    // corresponde a cada mes de cara a Contabilidad. Si hace falta cubrir
+    // varios meses, se hace en tramos, uno por mes.
+    const startDate = data.startDate || new Date().toISOString().slice(0, 10);
+    if (startDate.slice(0, 7) !== data.endDate.slice(0, 7)) {
+      throw new BadRequestException(
+        'Un plan puntual no puede cruzar de un mes a otro; hazlo en tramos, uno por mes',
+      );
+    }
+
     const currentActive = await this.purchaseModel.findOne({
       client: data.client,
       type: PurchaseType.PLAN,
@@ -170,6 +181,21 @@ export class PurchasesService {
     if (!existing.assignedInPerson) {
       throw new BadRequestException(
         'Este plan se pagó por Stripe, no se pueden editar sus fechas desde aquí',
+      );
+    }
+
+    const newStartDate = data.startDate || existing.activatedAt?.toISOString().slice(0, 10);
+    const newEndDate = data.endDate || existing.scheduledEndDate?.toISOString().slice(0, 10);
+    // Solo aplica a puntuales (los que tienen fecha de fin): mismo motivo
+    // que al crearlos, un precio único no se puede repartir entre meses.
+    if (
+      existing.scheduledEndDate &&
+      newStartDate &&
+      newEndDate &&
+      newStartDate.slice(0, 7) !== newEndDate.slice(0, 7)
+    ) {
+      throw new BadRequestException(
+        'Un plan puntual no puede cruzar de un mes a otro; hazlo en tramos, uno por mes',
       );
     }
 
