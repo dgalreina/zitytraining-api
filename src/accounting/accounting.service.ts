@@ -6,6 +6,7 @@ import { SetPaymentDto } from './dto/set-payment.dto';
 import { User, Role, UserStatus } from '../users/users.schema';
 import { Purchase, PurchaseStatus, PurchaseType, FinalMonthBilling } from '../purchases/purchases.schema';
 import { BookingsService } from '../bookings/bookings.service';
+import { Booking } from '../bookings/bookings.schema';
 
 interface PurchaseSpan {
   purchase: Purchase;
@@ -41,60 +42,99 @@ export class AccountingService {
       .sort({ firstName: 1, lastName: 1 })
       .exec();
 
+    const clientIds = clients.map((c) => (c._id as any).toString());
+
     const payments = await this.paymentModel.find({ year, month }).exec();
     const paymentByClient = new Map(payments.map((p) => [p.client.toString(), p]));
 
-    const clientsLedger = await Promise.all(
-      clients.map((client) =>
-        this.buildClientMonth(
-          client,
-          year,
-          month,
-          monthStart,
-          monthEndExclusive,
-          daysInMonth,
-          paymentByClient.get((client._id as any).toString()) || null,
-        ),
+    // Todo lo del mes se pide de una vez y se reparte por cliente aqui:
+    // con un centenar de clientes, una consulta por cliente multiplicaba
+    // por cien el trabajo de la base de datos en cada carga.
+    const purchasesByClient = await this.purchasesByClient(clientIds);
+    const bookingsByClient = await this.bookingsByClient(
+      clientIds,
+      monthStart,
+      monthEndExclusive,
+    );
+
+    const clientsLedger = clients.map((client, i) =>
+      this.buildClientMonth(
+        client,
+        monthStart,
+        monthEndExclusive,
+        daysInMonth,
+        purchasesByClient.get(clientIds[i]) || [],
+        bookingsByClient.get(clientIds[i]) || [],
+        paymentByClient.get(clientIds[i]) || null,
       ),
     );
 
     return { year, month, daysInMonth, clients: clientsLedger };
   }
 
-  private async buildClientMonth(
-    client: User,
-    year: number,
-    month: number,
-    monthStart: Date,
-    monthEndExclusive: Date,
-    daysInMonth: number,
-    payment: MonthlyPayment | null,
-  ) {
-    const clientId = (client._id as any).toString();
-
-    // PAUSED se excluye a propósito: mientras un plan está en pausa, es un
-    // puntual el que cubre ese periodo (ver purchases.service.ts). Sin
-    // fecha de fin propia, un pausado sin excluir se contaría como si
-    // siguiera cubriendo el mes entero, duplicando el cobro con el
-    // puntual que sí está activo de verdad.
+  // PAUSED se excluye a propósito: mientras un plan está en pausa, es un
+  // puntual el que cubre ese periodo (ver purchases.service.ts). Sin
+  // fecha de fin propia, un pausado sin excluir se contaría como si
+  // siguiera cubriendo el mes entero, duplicando el cobro con el
+  // puntual que sí está activo de verdad.
+  private async purchasesByClient(clientIds: string[]): Promise<Map<string, Purchase[]>> {
     const purchases = await this.purchaseModel
       .find({
-        client: clientId,
+        client: { $in: clientIds },
         type: PurchaseType.PLAN,
         status: { $nin: [PurchaseStatus.PENDING, PurchaseStatus.PAUSED] },
       })
       .exec();
 
-    const spans = this.overlappingSpans(purchases, monthStart, monthEndExclusive, daysInMonth);
+    const byClient = new Map<string, Purchase[]>();
+    for (const purchase of purchases) {
+      const key = purchase.client.toString();
+      const list = byClient.get(key);
+      if (list) list.push(purchase);
+      else byClient.set(key, [purchase]);
+    }
+    return byClient;
+  }
 
-    const bookings = await this.bookingsService.findByClientAndRange(
-      clientId,
+  private async bookingsByClient(
+    clientIds: string[],
+    monthStart: Date,
+    monthEndExclusive: Date,
+  ): Promise<Map<string, Booking[]>> {
+    const bookings = await this.bookingsService.findByClientsAndRange(
+      clientIds,
       monthStart.toISOString(),
       monthEndExclusive.toISOString(),
     );
-    // No cuentan como sesión dada las privadas de otro (no deberían salir
-    // de todos modos) ni los días marcados como festivo.
-    const realBookings = bookings.filter((b) => b.status !== 'cancelled');
+
+    const wanted = new Set(clientIds);
+    const byClient = new Map<string, Booking[]>();
+    for (const booking of bookings) {
+      if (booking.status === 'cancelled') continue;
+      // Una reserva de dúo/trío cuenta para cada uno de sus clientes.
+      for (const client of booking.clients) {
+        const key = client.toString();
+        if (!wanted.has(key)) continue;
+        const list = byClient.get(key);
+        if (list) list.push(booking);
+        else byClient.set(key, [booking]);
+      }
+    }
+    return byClient;
+  }
+
+  private buildClientMonth(
+    client: User,
+    monthStart: Date,
+    monthEndExclusive: Date,
+    daysInMonth: number,
+    purchases: Purchase[],
+    realBookings: Booking[],
+    payment: MonthlyPayment | null,
+  ) {
+    const clientId = (client._id as any).toString();
+
+    const spans = this.overlappingSpans(purchases, monthStart, monthEndExclusive, daysInMonth);
 
     const days = Array.from({ length: daysInMonth }, (_, i) => {
       const day = i + 1;

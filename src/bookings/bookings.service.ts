@@ -213,6 +213,29 @@ export class BookingsService {
       .exec();
   }
 
+  // Igual que findByClientAndRange pero para muchos clientes de una vez:
+  // una sola generacion de series y una sola consulta, en lugar de dos
+  // por cliente. Sin populate a proposito, porque quien agrega estas
+  // reservas (Contabilidad) solo mira fechas y estado. Un mismo Booking
+  // sale una vez aunque lo compartan varios clientes (duo/trio): quien
+  // llama lo reparte mirando su campo "clients".
+  async findByClientsAndRange(
+    clientIds: string[],
+    from: string,
+    to: string,
+  ): Promise<Booking[]> {
+    if (clientIds.length === 0) return [];
+    await this.ensureSeriesGenerated({ clients: { $in: clientIds } }, to);
+    return this.bookingModel
+      .find({
+        clients: { $in: clientIds },
+        startTime: { $lt: new Date(to) },
+        endTime: { $gt: new Date(from) },
+      })
+      .select('clients startTime status holidaySkip')
+      .exec();
+  }
+
   // Se mantiene por compatibilidad con otras posibles llamadas existentes.
   async findAllInRange(
     requestingUserId: string,
