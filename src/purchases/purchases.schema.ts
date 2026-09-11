@@ -29,6 +29,10 @@ export enum PurchaseStatus {
 export enum FinalMonthBilling {
   FULL_MONTH = 'full_month',
   SESSIONS = 'sessions',
+  // Para corregir un error del admin (ej. cambió de plan por un click
+  // equivocado): este mes no cuenta nada para el plan que se sustituye,
+  // como si nunca hubiera pasado por él.
+  NONE = 'none',
 }
 
 @Schema({ timestamps: true })
