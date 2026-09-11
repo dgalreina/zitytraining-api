@@ -22,6 +22,15 @@ export enum PurchaseStatus {
   COMPLETED = 'completed',
 }
 
+// Cómo se factura el mes en el que un plan mensual se para o se cambia a
+// mitad de mes (los mensuales no se prorratean: o se cobran íntegros, o
+// ese mes se recalcula entero como sesiones sueltas). Lo decide el admin
+// caso por caso al parar/cambiar el plan; de cara a Contabilidad.
+export enum FinalMonthBilling {
+  FULL_MONTH = 'full_month',
+  SESSIONS = 'sessions',
+}
+
 @Schema({ timestamps: true })
 export class Purchase extends Document {
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
@@ -86,6 +95,13 @@ export class Purchase extends Document {
   // Solo si endReason es 'changed': snapshot del nombre del plan que lo sustituyó.
   @Prop({ required: false })
   replacedByLabel?: string;
+
+  // Solo cuando un plan mensual se para o se cambia a mitad de mes (ver
+  // FinalMonthBilling). Sin valor: se paró justo al acabar el mes, o no
+  // aplica (planes puntuales o de sesiones libres, que ya tienen su
+  // propio precio cerrado).
+  @Prop({ type: String, enum: FinalMonthBilling, required: false })
+  finalMonthBilling?: FinalMonthBilling;
 }
 
 export const PurchaseSchema = SchemaFactory.createForClass(Purchase);

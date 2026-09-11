@@ -14,6 +14,7 @@ import { CreatePurchaseDto } from './dto/create-purchase.dto';
 import { AssignPlanDto } from './dto/assign-plan.dto';
 import { AssignPunctualPlanDto } from './dto/assign-punctual-plan.dto';
 import { UpdatePurchaseDatesDto } from './dto/update-purchase-dates.dto';
+import { CancelPurchaseDto } from './dto/cancel-purchase.dto';
 import { PurchaseStatus } from './purchases.schema';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -81,8 +82,8 @@ export class PurchasesController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN, Role.TRAINER)
   @Patch(':id/cancel')
-  cancel(@Req() req: any, @Param('id') id: string) {
-    return this.purchasesService.cancel(id, req.user.userId);
+  cancel(@Req() req: any, @Param('id') id: string, @Body() body: CancelPurchaseDto) {
+    return this.purchasesService.cancel(id, req.user.userId, body.finalMonthBilling);
   }
 
   // Admin o entrenador: corregir la fecha de inicio/fin de un plan

@@ -3,7 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { ConfigService } from '@nestjs/config';
 import { Model } from 'mongoose';
 import Stripe from 'stripe';
-import { Purchase, PurchaseStatus, PurchaseType, PaymentMode } from './purchases.schema';
+import { Purchase, PurchaseStatus, PurchaseType, PaymentMode, FinalMonthBilling } from './purchases.schema';
 import { CreatePurchaseDto } from './dto/create-purchase.dto';
 import { AssignPlanDto } from './dto/assign-plan.dto';
 import { AssignPunctualPlanDto } from './dto/assign-punctual-plan.dto';
@@ -106,6 +106,7 @@ export class PurchasesService {
       currentActive.endedBy = actorId as any;
       currentActive.endReason = 'changed';
       currentActive.replacedByLabel = data.itemLabel;
+      currentActive.finalMonthBilling = data.finalMonthBilling;
       await currentActive.save();
 
       if (currentActive.pausedPlan) {
@@ -125,7 +126,11 @@ export class PurchasesService {
   // Para un plan asignado a mano en cualquier momento; se queda como
   // historial con la fecha de inicio y de fin. Si era un plan puntual que
   // había pausado otro, se retoma el pausado.
-  async cancel(id: string, actorId: string): Promise<Purchase> {
+  async cancel(
+    id: string,
+    actorId: string,
+    finalMonthBilling?: FinalMonthBilling,
+  ): Promise<Purchase> {
     const existing = await this.purchaseModel.findById(id);
     if (!existing) {
       throw new NotFoundException(`Purchase with id ${id} not found`);
@@ -142,6 +147,7 @@ export class PurchasesService {
     existing.endedAt = new Date();
     existing.endedBy = actorId as any;
     existing.endReason = 'cancelled';
+    existing.finalMonthBilling = finalMonthBilling;
     await existing.save();
 
     if (existing.pausedPlan) {
