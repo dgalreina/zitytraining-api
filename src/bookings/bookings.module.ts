@@ -16,5 +16,6 @@ import { Holiday, HolidaySchema } from '../holidays/holidays.schema';
   ],
   controllers: [BookingsController],
   providers: [BookingsService],
+  exports: [BookingsService],
 })
 export class BookingsModule {}

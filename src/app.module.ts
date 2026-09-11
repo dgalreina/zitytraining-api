@@ -14,6 +14,7 @@ import { AttendanceModule } from './attendance/attendance.module';
 import { ExercisesModule } from './exercises/exercises.module';
 import { WorkoutsModule } from './workouts/workouts.module';
 import { HolidaysModule } from './holidays/holidays.module';
+import { AccountingModule } from './accounting/accounting.module';
 
 @Module({
   imports: [
@@ -35,7 +36,8 @@ import { HolidaysModule } from './holidays/holidays.module';
     AttendanceModule,
     ExercisesModule,
     WorkoutsModule,
-    HolidaysModule
+    HolidaysModule,
+    AccountingModule,
   ],
   controllers: [AppController],
   providers: [AppService],
