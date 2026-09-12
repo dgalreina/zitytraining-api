@@ -50,3 +50,13 @@ export class Booking extends Document {
 }
 
 export const BookingSchema = SchemaFactory.createForClass(Booking);
+
+// Esta colección es la que más crece: cada cliente deja unas 150 sesiones
+// al año, y las series se generan con medio año de adelanto. Sin estos
+// índices, listar una semana obliga a recorrerlas todas.
+BookingSchema.index({ trainer: 1, startTime: 1 });
+BookingSchema.index({ clients: 1, startTime: 1 });
+// Vista sin filtrar por entrenador ni cliente (ver findAllInRange).
+BookingSchema.index({ startTime: 1 });
+// Al generar, borrar o mover una serie entera se buscan sus sesiones.
+BookingSchema.index({ series: 1 });

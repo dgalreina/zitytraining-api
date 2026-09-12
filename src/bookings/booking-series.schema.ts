@@ -45,3 +45,10 @@ export class BookingSeries extends Document {
 }
 
 export const BookingSeriesSchema = SchemaFactory.createForClass(BookingSeries);
+
+// Antes de listar un rango se mira qué series les falta generar hasta
+// ahí (ver ensureSeriesGenerated), filtrando por entrenador o clientes
+// junto a generatedUntil.
+BookingSeriesSchema.index({ trainer: 1, generatedUntil: 1 });
+BookingSeriesSchema.index({ clients: 1, generatedUntil: 1 });
+BookingSeriesSchema.index({ generatedUntil: 1 });

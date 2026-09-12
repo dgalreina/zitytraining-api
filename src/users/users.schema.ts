@@ -68,3 +68,6 @@ export class User extends Document {
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
+
+// Los listados siempre piden un rol y, casi siempre, un estado.
+UserSchema.index({ roles: 1, status: 1 });

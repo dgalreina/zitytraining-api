@@ -109,3 +109,10 @@ export class Purchase extends Document {
 }
 
 export const PurchaseSchema = SchemaFactory.createForClass(Purchase);
+
+// Casi todo se consulta por cliente (su plan actual, su historial, o el
+// de todos a la vez en Contabilidad).
+PurchaseSchema.index({ client: 1, type: 1, status: 1 });
+// Los puntuales caducados se cierran de pasada buscando por fecha de fin
+// (ver resolveExpiredPunctualPlans).
+PurchaseSchema.index({ status: 1, scheduledEndDate: 1 });
