@@ -166,7 +166,10 @@ export class BookingsService {
     }
     return this.bookingModel
       .find(query)
-      .populate('clients', 'firstName lastName')
+      // El telefono lo necesita el envio de recordatorios por WhatsApp.
+      // Solo va en las vistas de entrenador/admin: en la de un cliente
+      // expondria el numero de sus companeros de duo o trio.
+      .populate('clients', 'firstName lastName phone')
       .populate(WORKOUT_POPULATE)
       .exec();
   }
@@ -190,7 +193,7 @@ export class BookingsService {
         $or: [{ isPrivate: { $ne: true } }, { trainer: requestingUserId }],
       })
       .populate('trainer', 'firstName lastName color')
-      .populate('clients', 'firstName lastName')
+      .populate('clients', 'firstName lastName phone')
       .populate(WORKOUT_POPULATE)
       .exec();
   }
@@ -250,7 +253,7 @@ export class BookingsService {
         $or: [{ isPrivate: { $ne: true } }, { trainer: requestingUserId }],
       })
       .populate('trainer', 'firstName lastName color')
-      .populate('clients', 'firstName lastName')
+      .populate('clients', 'firstName lastName phone')
       .populate(WORKOUT_POPULATE)
       .exec();
   }
@@ -284,7 +287,7 @@ export class BookingsService {
     const updated = await this.bookingModel
       .findByIdAndUpdate(id, updatePayload, { new: true })
       .populate('trainer', 'firstName lastName color')
-      .populate('clients', 'firstName lastName')
+      .populate('clients', 'firstName lastName phone')
       .populate(WORKOUT_POPULATE)
       .exec();
     return updated!;
