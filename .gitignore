@@ -41,6 +41,10 @@ lerna-debug.log*
 .env.test.local
 .env.production.local
 .env.local
+# Cualquier otro .env (.env.dev, .env.staging...): llevan credenciales y
+# no deben salir de la maquina. Un .env.example sin secretos si se sube.
+.env.*
+!.env.example
 
 # temp directory
 .temp
