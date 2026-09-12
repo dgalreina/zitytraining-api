@@ -8,6 +8,11 @@ import { Purchase, PurchaseStatus, PurchaseType, FinalMonthBilling } from '../pu
 import { BookingsService } from '../bookings/bookings.service';
 import { Booking } from '../bookings/bookings.schema';
 
+// De dónde sale el importe de un tramo: el precio del plan entero, las
+// sesiones dadas dentro del tramo, o nada (el admin decidió no cobrar
+// ese último mes).
+type SegmentBasis = 'full_month' | 'sessions' | 'none';
+
 interface PurchaseSpan {
   purchase: Purchase;
   // Días del mes (1-based, inclusive) que este tramo cubre dentro del mes pedido.
@@ -35,10 +40,12 @@ export class AccountingService {
     const monthEndExclusive = new Date(Date.UTC(year, month, 1));
     const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
 
-    // De momento solo clientes activos; si hace falta ver meses de
-    // clientes ya dados de baja, se revisará más adelante.
+    // Se traen también los dados de baja y los borrados: alguien que se
+    // fue a mitad de mes puede dejar sesiones dadas o dinero pendiente,
+    // y si no apareciese aquí ese cobro se perdería. Más abajo se
+    // descartan los que no dejaron nada en este mes.
     const clients = await this.userModel
-      .find({ roles: Role.CLIENT, status: UserStatus.ACTIVE })
+      .find({ roles: Role.CLIENT })
       .sort({ firstName: 1, lastName: 1 })
       .exec();
 
@@ -69,7 +76,14 @@ export class AccountingService {
       ),
     );
 
-    return { year, month, daysInMonth, clients: clientsLedger };
+    // De quien ya no es cliente solo interesa el mes en el que dejó algo
+    // detrás: sesiones dadas o dinero por cobrar. Sin esto, la tabla se
+    // llenaría de gente que hace meses que no entrena.
+    const visibleClients = clientsLedger.filter(
+      (c) => !c.inactive || c.sessionCount > 0 || c.due > 0,
+    );
+
+    return { year, month, daysInMonth, clients: visibleClients };
   }
 
   // PAUSED se excluye a propósito: mientras un plan está en pausa, es un
@@ -159,11 +173,21 @@ export class AccountingService {
         ? span.purchase.price / span.purchase.sessionCount
         : 0;
 
+      // "basis" explica de dónde sale el importe, para que la pantalla
+      // pueda justificarlo sin rehacer el cálculo por su cuenta: cobrar
+      // 2 sesiones de un tramo de 22 días no se entiende viendo solo el
+      // total.
       let amount: number;
+      let basis: SegmentBasis;
+      let sessions: number | null = null;
+
       if (span.isFreeSessions) {
-        amount = sessionsInRange(span.fromDay, span.toDay) * pricePerSession;
+        sessions = sessionsInRange(span.fromDay, span.toDay);
+        amount = sessions * pricePerSession;
+        basis = 'sessions';
       } else if (span.coversFullMonth) {
         amount = span.purchase.price;
+        basis = 'full_month';
       } else {
         // Tramo de mes cojo (el plan se paró/cambió a mitad de mes): el
         // admin ya eligió cómo se factura al pararlo/cambiarlo. Sin
@@ -171,13 +195,17 @@ export class AccountingService {
         // se asume mes completo, que es como se facturaba antes de esto.
         switch (span.purchase.finalMonthBilling) {
           case FinalMonthBilling.SESSIONS:
-            amount = sessionsInRange(span.fromDay, span.toDay) * pricePerSession;
+            sessions = sessionsInRange(span.fromDay, span.toDay);
+            amount = sessions * pricePerSession;
+            basis = 'sessions';
             break;
           case FinalMonthBilling.NONE:
             amount = 0;
+            basis = 'none';
             break;
           default:
             amount = span.purchase.price;
+            basis = 'full_month';
         }
       }
 
@@ -189,6 +217,10 @@ export class AccountingService {
         fromDay: span.fromDay,
         toDay: span.toDay,
         amount: Math.round(amount * 100) / 100,
+        basis,
+        sessions,
+        pricePerSession:
+          basis === 'sessions' ? Math.round(pricePerSession * 100) / 100 : null,
       };
     });
 
@@ -196,6 +228,7 @@ export class AccountingService {
       clientId,
       firstName: client.firstName,
       lastName: client.lastName,
+      inactive: client.status !== UserStatus.ACTIVE,
       segments,
       days,
       sessionCount: days.filter((d) => d.hasClass).length,
