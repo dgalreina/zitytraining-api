@@ -15,6 +15,7 @@ import { ExercisesModule } from './exercises/exercises.module';
 import { WorkoutsModule } from './workouts/workouts.module';
 import { HolidaysModule } from './holidays/holidays.module';
 import { AccountingModule } from './accounting/accounting.module';
+import { RemindersModule } from './reminders/reminders.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { AccountingModule } from './accounting/accounting.module';
     WorkoutsModule,
     HolidaysModule,
     AccountingModule,
+    RemindersModule,
   ],
   controllers: [AppController],
   providers: [AppService],
