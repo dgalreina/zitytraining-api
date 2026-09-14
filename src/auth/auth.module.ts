@@ -7,11 +7,17 @@ import { AuthController } from './auth.controller';
 import { UsersModule } from '../users/users.module';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { RefreshToken, RefreshTokenSchema } from './refresh-token.schema';
+import { PasswordResetToken, PasswordResetTokenSchema } from './password-reset-token.schema';
+import { User, UserSchema } from '../users/users.schema';
 
 @Module({
   imports: [
     UsersModule,
-    MongooseModule.forFeature([{ name: RefreshToken.name, schema: RefreshTokenSchema }]),
+    MongooseModule.forFeature([
+      { name: RefreshToken.name, schema: RefreshTokenSchema },
+      { name: PasswordResetToken.name, schema: PasswordResetTokenSchema },
+      { name: User.name, schema: UserSchema },
+    ]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

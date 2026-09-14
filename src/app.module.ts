@@ -16,6 +16,7 @@ import { WorkoutsModule } from './workouts/workouts.module';
 import { HolidaysModule } from './holidays/holidays.module';
 import { AccountingModule } from './accounting/accounting.module';
 import { RemindersModule } from './reminders/reminders.module';
+import { MailModule } from './mail/mail.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { RemindersModule } from './reminders/reminders.module';
         uri: configService.get<string>('MONGO_URI'),
       }),
     }),
+    MailModule,
     UsersModule,
     PurchasesModule,
     AuthModule,

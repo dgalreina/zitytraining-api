@@ -7,8 +7,14 @@ import * as crypto from 'crypto';
 import { UsersService } from '../users/users.service';
 import { Role, UserStatus } from '../users/users.schema';
 import { RefreshToken } from './refresh-token.schema';
+import { PasswordResetToken } from './password-reset-token.schema';
+import { User } from '../users/users.schema';
+import { MailService } from '../mail/mail.service';
 
 const REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 dias
+// Corto a propósito: un enlace que cambia la contraseña sin más pruebas
+// no debería seguir sirviendo horas después de pedirlo.
+const PASSWORD_RESET_TTL_MS = 60 * 60 * 1000; // 1 hora
 
 function hashToken(token: string): string {
   return crypto.createHash('sha256').update(token).digest('hex');
@@ -20,6 +26,10 @@ export class AuthService {
     private usersService: UsersService,
     private jwtService: JwtService,
     @InjectModel(RefreshToken.name) private refreshTokenModel: Model<RefreshToken>,
+    @InjectModel(PasswordResetToken.name)
+    private passwordResetModel: Model<PasswordResetToken>,
+    @InjectModel(User.name) private userModel: Model<User>,
+    private mailService: MailService,
   ) {}
 
   private async issueTokens(user: { _id: any; email?: string; roles: Role[] }) {
@@ -113,5 +123,77 @@ export class AuthService {
   // el mismo: dejar de poder usarlo.
   async logout(refreshToken: string): Promise<void> {
     await this.refreshTokenModel.deleteOne({ tokenHash: hashToken(refreshToken) });
+  }
+
+  // Responde siempre lo mismo, exista el correo o no: si distinguiera,
+  // cualquiera podría averiguar qué direcciones están dadas de alta
+  // probando una a una.
+  async forgotPassword(email: string): Promise<{ success: true }> {
+    const user = await this.userModel.findOne({
+      email: email.toLowerCase().trim(),
+      status: UserStatus.ACTIVE,
+    });
+
+    // Sin contraseña es que nunca ha entrado (clientes dados de alta a
+    // mano): no hay nada que recuperar.
+    if (user && user.password) {
+      const raw = crypto.randomBytes(32).toString('hex');
+
+      // Solo vale el último enlace pedido: los anteriores dejan de servir.
+      await this.passwordResetModel.deleteMany({ user: user._id });
+      await this.passwordResetModel.create({
+        user: user._id,
+        tokenHash: hashToken(raw),
+        expiresAt: new Date(Date.now() + PASSWORD_RESET_TTL_MS),
+      });
+
+      const base = process.env.APP_URL || 'http://localhost:3000';
+      const enlace = `${base}/reset-password?token=${raw}`;
+      await this.mailService.send(
+        user.email!,
+        'Recuperar tu contraseña de ZityTraining',
+        [
+          `<p>Hola ${user.firstName},</p>`,
+          '<p>Has pedido cambiar la contraseña de tu cuenta de ZityTraining.</p>',
+          `<p><a href="${enlace}">Pulsa aquí para elegir una nueva</a></p>`,
+          '<p>El enlace caduca en una hora y solo se puede usar una vez.</p>',
+          '<p>Si no has sido tú, no hace falta que hagas nada: tu contraseña sigue igual.</p>',
+        ].join(''),
+        [
+          `Hola ${user.firstName},`,
+          '',
+          'Has pedido cambiar la contraseña de tu cuenta de ZityTraining.',
+          'Abre este enlace para elegir una nueva:',
+          enlace,
+          '',
+          'El enlace caduca en una hora y solo se puede usar una vez.',
+          'Si no has sido tú, no hace falta que hagas nada: tu contraseña sigue igual.',
+        ].join('\n'),
+      );
+    }
+
+    return { success: true };
+  }
+
+  async resetPassword(token: string, newPassword: string): Promise<{ success: true }> {
+    const registro = await this.passwordResetModel.findOne({ tokenHash: hashToken(token) });
+    if (!registro || registro.expiresAt.getTime() < Date.now()) {
+      throw new UnauthorizedException('El enlace no es válido o ha caducado');
+    }
+
+    const user = await this.userModel.findById(registro.user);
+    if (!user) {
+      throw new UnauthorizedException('El enlace no es válido o ha caducado');
+    }
+
+    user.password = await bcrypt.hash(newPassword, 10);
+    await user.save();
+
+    // De un solo uso, y además se cierran las sesiones abiertas: si alguien
+    // había entrado con la contraseña vieja, deja de tener acceso.
+    await this.passwordResetModel.deleteMany({ user: user._id });
+    await this.refreshTokenModel.deleteMany({ user: user._id });
+
+    return { success: true };
   }
 }
