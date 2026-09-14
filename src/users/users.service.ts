@@ -80,7 +80,10 @@ export class UsersService {
   // molesta marcarlo en el resto.
   async findAll(status?: UserStatus, requesterId?: string): Promise<any[]> {
     const query = status ? { status } : { status: { $ne: UserStatus.DELETED } };
-    const users = await this.userModel.find(query).lean().exec();
+    // Hay que excluir la contraseña a mano: el schema la borra en su
+    // toJSON, pero lean() devuelve el objeto crudo de Mongo y ese paso no
+    // llega a ejecutarse, así que el hash acababa saliendo en la respuesta.
+    const users = await this.userModel.find(query).select('-password').lean().exec();
 
     if (!requesterId) return users;
 

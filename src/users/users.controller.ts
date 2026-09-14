@@ -90,7 +90,11 @@ export class UsersController {
   // Sin query: todos menos los eliminados. ?status=deleted: solo los
   // eliminados (para la papelera), aparte, no se mezcla con "todos".
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  // También los entrenadores: la app da por hecho que ven a todos los
+  // clientes y al resto del personal (lo usan Calendario, Clientes y
+  // Fichar). Sin esto, un entrenador que no fuese además admin recibía un
+  // 403 y esas tres pantallas se le quedaban vacías.
+  @Roles(Role.ADMIN, Role.TRAINER)
   @Get()
   findAll(@Req() req: any, @Query('status') status?: UserStatus) {
     return this.usersService.findAll(status, req.user.userId);
