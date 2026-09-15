@@ -44,8 +44,13 @@ export class AccountingService {
     // fue a mitad de mes puede dejar sesiones dadas o dinero pendiente,
     // y si no apareciese aquí ese cobro se perdería. Más abajo se
     // descartan los que no dejaron nada en este mes.
+    // De cada cliente solo hacen falta el nombre y si sigue de alta: traer
+    // el documento entero significaba mover ficha completa (direcciones,
+    // teléfonos, el hash de la contraseña...) de cientos de personas para
+    // usar tres campos.
     const clients = await this.userModel
       .find({ roles: Role.CLIENT })
+      .select('firstName lastName status')
       .sort({ firstName: 1, lastName: 1 })
       .exec();
 
