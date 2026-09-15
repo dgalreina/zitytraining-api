@@ -206,10 +206,20 @@ export class PurchasesService {
     }
   }
 
-  async findByClient(clientId: string): Promise<Purchase[]> {
+  // "onlyCurrent" deja fuera lo que ya terminó, que es justo el historial:
+  // se usa para los entrenadores, que ven el plan en curso de su cliente
+  // pero no el registro de contrataciones.
+  async findByClient(
+    clientId: string,
+    options: { onlyCurrent?: boolean } = {},
+  ): Promise<Purchase[]> {
     await this.resolveExpiredPunctualPlans(clientId);
+    const filtro: Record<string, unknown> = { client: clientId };
+    if (options.onlyCurrent) {
+      filtro.status = { $in: [PurchaseStatus.ACTIVE, PurchaseStatus.PAUSED] };
+    }
     return this.purchaseModel
-      .find({ client: clientId })
+      .find(filtro)
       .sort({ createdAt: -1 })
       .populate('createdBy', 'firstName lastName color')
       .populate('endedBy', 'firstName lastName color')

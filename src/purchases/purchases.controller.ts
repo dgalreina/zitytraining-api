@@ -43,53 +43,57 @@ export class PurchasesController {
     return this.purchasesService.findByClient(req.user.userId);
   }
 
-  // Admin o entrenador: ver las compras de un cliente concreto
+  // Al entrenador se le manda solo lo que esta en curso, que es lo que
+  // ve en "Plan activo". El historial de contrataciones es informacion de
+  // administracion, asi que ni se le envia: esconderlo solo en la pantalla
+  // dejaria los datos a la vista de cualquiera que mire las peticiones.
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN, Role.TRAINER)
   @Get('client/:id')
-  findByClient(@Param('id') id: string) {
-    return this.purchasesService.findByClient(id);
+  findByClient(@Req() req: any, @Param('id') id: string) {
+    const isAdmin = req.user.roles?.includes(Role.ADMIN);
+    return this.purchasesService.findByClient(id, { onlyCurrent: !isAdmin });
   }
 
-  // Admin o entrenador: asignar un plan directamente a un cliente
-  // (pagado en mano, sin Stripe).
+  // Solo admin: contratar planes es cosa de administracion, un
+  // entrenador ve el plan activo de su cliente pero no lo toca.
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN, Role.TRAINER)
+  @Roles(Role.ADMIN)
   @Post('assign')
   assignPlan(@Req() req: any, @Body() body: AssignPlanDto) {
     return this.purchasesService.assignPlan(body, req.user.userId);
   }
 
-  // Admin o entrenador: plan puntual con fecha de fin; pausa el plan
-  // activo del cliente mientras dura y lo retoma al acabar.
+  // Solo admin: plan puntual con fecha de fin; pausa el plan activo del
+  // cliente mientras dura y lo retoma al acabar.
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN, Role.TRAINER)
+  @Roles(Role.ADMIN)
   @Post('assign-punctual')
   assignPunctualPlan(@Req() req: any, @Body() body: AssignPunctualPlanDto) {
     return this.purchasesService.assignPunctualPlan(body, req.user.userId);
   }
 
-  // Admin o entrenador: sustituir el plan activo por otro directamente
+  // Solo admin: sustituir el plan activo por otro directamente
   // (definitivo, no se retoma el anterior).
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN, Role.TRAINER)
+  @Roles(Role.ADMIN)
   @Post('change')
   changePlan(@Req() req: any, @Body() body: AssignPlanDto) {
     return this.purchasesService.changePlan(body, req.user.userId);
   }
 
-  // Admin o entrenador: parar un plan asignado a mano en cualquier momento.
+  // Solo admin: parar un plan asignado a mano en cualquier momento.
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN, Role.TRAINER)
+  @Roles(Role.ADMIN)
   @Patch(':id/cancel')
   cancel(@Req() req: any, @Param('id') id: string, @Body() body: CancelPurchaseDto) {
     return this.purchasesService.cancel(id, req.user.userId, body.finalMonthBilling);
   }
 
-  // Admin o entrenador: corregir la fecha de inicio/fin de un plan
-  // asignado a mano, por si se introdujo mal.
+  // Solo admin: corregir la fecha de inicio/fin de un plan asignado a
+  // mano, por si se introdujo mal.
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN, Role.TRAINER)
+  @Roles(Role.ADMIN)
   @Patch(':id/dates')
   updateDates(@Req() req: any, @Param('id') id: string, @Body() body: UpdatePurchaseDatesDto) {
     return this.purchasesService.updateDates(id, body, req.user.userId);
