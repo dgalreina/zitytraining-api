@@ -173,8 +173,14 @@ export class UsersService {
     return { success: true };
   }
 
+  // Se excluyen los borrados a propósito: desde que su email puede volver
+  // a usarse, pueden convivir dos usuarios con la misma dirección (el que
+  // se borró y el nuevo). Sin este filtro, el login se topaba con el
+  // borrado, comparaba contra su contraseña vieja y rechazaba al bueno.
   async findByEmail(email: string): Promise<User | null> {
-    return this.userModel.findOne({ email }).exec();
+    return this.userModel
+      .findOne({ email, status: { $ne: UserStatus.DELETED } })
+      .exec();
   }
 
   async changePassword(id: string, data: ChangePasswordDto): Promise<{ success: true }> {
