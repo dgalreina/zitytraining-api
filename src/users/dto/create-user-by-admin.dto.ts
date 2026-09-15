@@ -3,7 +3,6 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
-  IsStrongPassword,
   IsArray,
   IsEnum,
   IsDateString,
@@ -30,14 +29,14 @@ export class CreateUserByAdminDto {
 
   // Solo hace falta para admin/entrenador, que sí pueden entrar en la
   // app; un cliente no necesita contraseña.
+  //
+  // Sin exigencias de fortaleza a propósito: esta es la contraseña que le
+  // pone el admin al darle de alta, para que entre la primera vez. En
+  // cuanto la cambia él mismo (o la recupera por correo) sí se le piden
+  // mayúsculas, números y símbolo.
   @ValidateIf((o) => !o.roles?.includes(Role.CLIENT))
-  @IsStrongPassword(
-    { minLength: 8, minLowercase: 1, minUppercase: 1, minNumbers: 1, minSymbols: 1 },
-    {
-      message:
-        'La contraseña debe tener al menos 8 caracteres, con mayúsculas, minúsculas, números y algún símbolo',
-    },
-  )
+  @IsString()
+  @IsNotEmpty({ message: 'Ponle una contraseña para que pueda entrar la primera vez' })
   password?: string;
 
   @IsNotEmpty()
