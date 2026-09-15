@@ -58,6 +58,12 @@ export class User extends Document {
   @Prop({ type: String, enum: UserStatus, default: UserStatus.ACTIVE })
   status!: UserStatus;
 
+  // La contraseña la puso el admin al darle de alta y solo vale para
+  // entrar la primera vez: hasta que elija una suya, no puede hacer nada
+  // más en la aplicación (ver JwtStrategy).
+  @Prop({ type: Boolean, default: false })
+  mustChangePassword!: boolean;
+
   @Prop({ required: false })
   color?: string; // color asignado al entrenador, ej. '#6aa842'
 

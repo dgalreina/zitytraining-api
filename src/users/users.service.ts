@@ -42,6 +42,9 @@ export class UsersService {
       ...data,
       password: hashedPassword,
       status: UserStatus.ACTIVE,
+      // Quien entra en la app tendrá que elegir su propia contraseña la
+      // primera vez: la que pone el admin es solo para ese primer acceso.
+      mustChangePassword: !!hashedPassword,
     });
     return await created.save();
   } catch (err: any) {
@@ -194,6 +197,8 @@ export class UsersService {
     }
 
     user.password = await bcrypt.hash(data.newPassword, 10);
+    // Ya ha elegido una suya: se levanta el bloqueo del primer acceso.
+    user.mustChangePassword = false;
     await user.save();
     return { success: true };
   }

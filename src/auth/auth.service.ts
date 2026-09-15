@@ -86,6 +86,9 @@ export class AuthService {
         email: user.email,
         roles: user.roles,
         color: user.color || null,
+        // Si sigue con la contraseña que le puso el admin, la app tiene
+        // que llevarle a cambiarla antes de dejarle hacer nada.
+        mustChangePassword: user.mustChangePassword,
       },
     };
   }
@@ -187,6 +190,9 @@ export class AuthService {
     }
 
     user.password = await bcrypt.hash(newPassword, 10);
+    // La ha elegido él por su cuenta, así que tampoco arrastra ya la del
+    // admin.
+    user.mustChangePassword = false;
     await user.save();
 
     // De un solo uso, y además se cierran las sesiones abiertas: si alguien
