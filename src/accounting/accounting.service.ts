@@ -100,7 +100,9 @@ export class AccountingService {
       .find({
         client: { $in: clientIds },
         type: PurchaseType.PLAN,
-        status: { $ne: PurchaseStatus.PENDING },
+        // Un anulado es como si no hubiera existido: ni se factura ni
+        // se dibuja.
+        status: { $nin: [PurchaseStatus.PENDING, PurchaseStatus.VOIDED] },
       })
       .exec();
 

@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { ConfigService } from '@nestjs/config';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import Stripe from 'stripe';
 import { Purchase, PurchaseStatus, PurchaseType, PaymentMode, FinalMonthBilling } from './purchases.schema';
 import { CreatePurchaseDto } from './dto/create-purchase.dto';
@@ -151,12 +151,53 @@ export class PurchasesService {
     await existing.save();
 
     if (existing.pausedPlan) {
-      await this.purchaseModel.findByIdAndUpdate(existing.pausedPlan, {
-        status: PurchaseStatus.ACTIVE,
-      });
+      await this.resumePausedPlan(existing.pausedPlan);
     }
 
     return existing;
+  }
+
+  // Anula un plan asignado por error. A diferencia de "cancel", aquí no
+  // hay último mes que facturar: la idea es que sea como si nunca hubiera
+  // existido. Si estaba tapando otro plan, ese vuelve a estar activo. Lo
+  // que no se hace es resucitar un plan que este hubiera sustituido con
+  // "cambiar plan": eso lo reasigna el admin a mano.
+  async voidPurchase(id: string, actorId: string): Promise<Purchase> {
+    const existing = await this.purchaseModel.findById(id);
+    if (!existing) {
+      throw new NotFoundException(`Purchase with id ${id} not found`);
+    }
+    if (!existing.assignedInPerson) {
+      throw new BadRequestException(
+        'Este plan se pagó por Stripe, no se puede anular desde aquí',
+      );
+    }
+    if (existing.status !== PurchaseStatus.ACTIVE && existing.status !== PurchaseStatus.PAUSED) {
+      throw new BadRequestException('Solo se puede anular un plan que siga en curso');
+    }
+
+    existing.status = PurchaseStatus.VOIDED;
+    existing.endedAt = new Date();
+    existing.endedBy = actorId as any;
+    existing.endReason = 'voided';
+    existing.finalMonthBilling = FinalMonthBilling.NONE;
+    await existing.save();
+
+    if (existing.pausedPlan) {
+      await this.resumePausedPlan(existing.pausedPlan);
+    }
+
+    return existing;
+  }
+
+  // Devuelve a activo el plan que un puntual tenía tapado. Solo si sigue
+  // en pausa: si mientras tanto se anuló o se paró, no hay que
+  // resucitarlo.
+  private async resumePausedPlan(pausedPlanId: Types.ObjectId): Promise<void> {
+    await this.purchaseModel.findOneAndUpdate(
+      { _id: pausedPlanId, status: PurchaseStatus.PAUSED },
+      { status: PurchaseStatus.ACTIVE },
+    );
   }
 
   // Corrige la fecha de inicio (y, si es puntual, la de fin) de un plan
@@ -199,9 +240,7 @@ export class PurchasesService {
       await plan.save();
 
       if (plan.pausedPlan) {
-        await this.purchaseModel.findByIdAndUpdate(plan.pausedPlan, {
-          status: PurchaseStatus.ACTIVE,
-        });
+        await this.resumePausedPlan(plan.pausedPlan);
       }
     }
   }

@@ -20,6 +20,10 @@ export enum PurchaseStatus {
   PAUSED = 'paused',
   CANCELLED = 'cancelled',
   COMPLETED = 'completed',
+  // Asignado por error (plan equivocado, persona equivocada): como si no
+  // hubiera existido. No se factura nada y Contabilidad lo ignora, pero
+  // queda en el historial para saber quién lo anuló y cuándo.
+  VOIDED = 'voided',
 }
 
 // Cómo se factura el mes en el que un plan mensual se para o se cambia a
@@ -93,8 +97,8 @@ export class Purchase extends Document {
   @Prop({ type: Types.ObjectId, ref: 'User', required: false })
   endedBy?: Types.ObjectId;
 
-  @Prop({ type: String, enum: ['cancelled', 'changed'], required: false })
-  endReason?: 'cancelled' | 'changed';
+  @Prop({ type: String, enum: ['cancelled', 'changed', 'voided'], required: false })
+  endReason?: 'cancelled' | 'changed' | 'voided';
 
   // Solo si endReason es 'changed': snapshot del nombre del plan que lo sustituyó.
   @Prop({ required: false })

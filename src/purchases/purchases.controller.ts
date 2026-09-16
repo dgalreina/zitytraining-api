@@ -90,6 +90,14 @@ export class PurchasesController {
     return this.purchasesService.cancel(id, req.user.userId, body.finalMonthBilling);
   }
 
+  // Solo admin: anular un plan asignado por error, sin facturar nada.
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @Patch(':id/void')
+  voidPurchase(@Req() req: any, @Param('id') id: string) {
+    return this.purchasesService.voidPurchase(id, req.user.userId);
+  }
+
   // Solo admin: corregir la fecha de inicio/fin de un plan asignado a
   // mano, por si se introdujo mal.
   @UseGuards(JwtAuthGuard, RolesGuard)
