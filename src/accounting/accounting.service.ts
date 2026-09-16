@@ -91,17 +91,16 @@ export class AccountingService {
     return { year, month, daysInMonth, clients: visibleClients };
   }
 
-  // PAUSED se excluye a propósito: mientras un plan está en pausa, es un
-  // puntual el que cubre ese periodo (ver purchases.service.ts). Sin
-  // fecha de fin propia, un pausado sin excluir se contaría como si
-  // siguiera cubriendo el mes entero, duplicando el cobro con el
-  // puntual que sí está activo de verdad.
+  // Los pausados también entran: un plan en pausa sigue siendo del
+  // cliente, solo que un puntual lo tapa durante un tiempo. Cuándo se
+  // pausó y cuándo se retoma se saca del propio puntual (ver
+  // coverageIntervals), así que aquí no hay que excluir nada.
   private async purchasesByClient(clientIds: string[]): Promise<Map<string, Purchase[]>> {
     const purchases = await this.purchaseModel
       .find({
         client: { $in: clientIds },
         type: PurchaseType.PLAN,
-        status: { $nin: [PurchaseStatus.PENDING, PurchaseStatus.PAUSED] },
+        status: { $ne: PurchaseStatus.PENDING },
       })
       .exec();
 
@@ -252,12 +251,50 @@ export class AccountingService {
     return purchase.itemId.startsWith('sesiones-libres-');
   }
 
+  // Un puntual activo ya sabe cuándo acaba: no hay que esperar a que
+  // llegue el día y se cierre para que Contabilidad lo tenga en cuenta.
+  // Si no, al mirar un mes futuro seguía cubriéndolo entero.
   private purchaseEndDate(purchase: Purchase): Date | null {
     if (purchase.endedAt) return purchase.endedAt;
-    if (purchase.status === PurchaseStatus.COMPLETED && purchase.scheduledEndDate) {
-      return purchase.scheduledEndDate;
-    }
+    if (purchase.scheduledEndDate) return purchase.scheduledEndDate;
     return null;
+  }
+
+  // Periodos en los que un plan cubre de verdad al cliente: desde que se
+  // activa hasta que acaba, quitando los huecos de los puntuales que lo
+  // pausaron (cada puntual guarda en pausedPlan a quién tapó). Con esto
+  // un mensual pausado en septiembre por un puntual sale bien en agosto
+  // (aún activo), no sale en septiembre (tapado) y vuelve a salir en
+  // octubre (retomado), sin que nadie tenga que haberlo cerrado o
+  // reabierto todavía.
+  private coverageIntervals(
+    purchase: Purchase,
+    all: Purchase[],
+  ): Array<{ start: number; end: number }> {
+    if (!purchase.activatedAt) return [];
+    const start = purchase.activatedAt.getTime();
+    const endDate = this.purchaseEndDate(purchase);
+    const end = endDate ? endDate.getTime() : Infinity;
+
+    const id = String(purchase._id);
+    const gaps = all
+      .filter((p) => p.pausedPlan && String(p.pausedPlan) === id && p.activatedAt)
+      .map((p) => {
+        const e = this.purchaseEndDate(p);
+        return { start: p.activatedAt!.getTime(), end: e ? e.getTime() : Infinity };
+      })
+      .sort((a, b) => a.start - b.start);
+
+    const result: Array<{ start: number; end: number }> = [];
+    let cursor = start;
+    for (const gap of gaps) {
+      if (gap.end <= cursor) continue;
+      if (gap.start > cursor) result.push({ start: cursor, end: Math.min(gap.start, end) });
+      cursor = Math.max(cursor, gap.end);
+      if (cursor >= end) break;
+    }
+    if (cursor < end) result.push({ start: cursor, end });
+    return result;
   }
 
   private overlappingSpans(
@@ -268,22 +305,32 @@ export class AccountingService {
   ): PurchaseSpan[] {
     const spans: PurchaseSpan[] = [];
 
+    const monthStartMs = monthStart.getTime();
+    const monthEndMs = monthEndExclusive.getTime();
+
     for (const purchase of purchases) {
-      if (!purchase.activatedAt) continue;
-      const end = this.purchaseEndDate(purchase);
+      // Del mes solo interesa el primer y el último día cubiertos. Si un
+      // puntual de sesiones libres abre un hueco a mitad de mes, el
+      // mensual se sigue cobrando entero (no se prorratea) y el hueco lo
+      // pinta el propio puntual encima.
+      let fromDay: number | null = null;
+      let toDay: number | null = null;
 
-      const overlaps =
-        purchase.activatedAt < monthEndExclusive && (end === null || end > monthStart);
-      if (!overlaps) continue;
+      for (const { start, end } of this.coverageIntervals(purchase, purchases)) {
+        if (start >= monthEndMs || end <= monthStartMs) continue;
 
-      const fromDay = purchase.activatedAt <= monthStart ? 1 : purchase.activatedAt.getUTCDate();
-      // "toDay" es inclusive: si el tramo sigue abierto o se acaba más
-      // allá de este mes, llega hasta el último día; si se acaba dentro
-      // de este mes, el día de fin (scheduledEndDate/endedAt) es el
-      // primero que YA NO cuenta, así que el último cubierto es el anterior.
-      const toDay =
-        end === null || end >= monthEndExclusive ? daysInMonth : end.getUTCDate() - 1;
-      if (toDay < fromDay) continue;
+        const from = start <= monthStartMs ? 1 : new Date(start).getUTCDate();
+        // "toDay" es inclusive: si el tramo sigue abierto o se acaba más
+        // allá de este mes, llega hasta el último día; si se acaba dentro
+        // de este mes, el día de fin es el primero que YA NO cuenta, así
+        // que el último cubierto es el anterior.
+        const to = end >= monthEndMs ? daysInMonth : new Date(end).getUTCDate() - 1;
+        if (to < from) continue;
+
+        fromDay = fromDay === null ? from : Math.min(fromDay, from);
+        toDay = toDay === null ? to : Math.max(toDay, to);
+      }
+      if (fromDay === null || toDay === null) continue;
 
       spans.push({
         purchase,
