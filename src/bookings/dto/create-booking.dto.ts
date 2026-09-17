@@ -35,6 +35,11 @@ export class CreateBookingDto {
   @IsBoolean()
   isPrivate?: boolean;
 
+  // Implica isPrivate (lo fuerza el servicio aunque no venga).
+  @IsOptional()
+  @IsBoolean()
+  isInterview?: boolean;
+
   // null explicito quita el entrenamiento asignado; omitido no lo toca.
   @IsOptional()
   @IsMongoId()

@@ -44,6 +44,10 @@ export class BookingsService {
       throw new ConflictException('La hora de fin debe ser posterior a la de inicio');
     }
 
+    // Una entrevista es privada por definición: se fuerza aquí para que
+    // ningún cliente de la API pueda crear una "entrevista pública".
+    if (rest.isInterview) rest.isPrivate = true;
+
     if (recurrence === 'weekly') {
       return this.createSeries(rest, clients, startTime, endTime, workoutId);
     }
@@ -77,6 +81,7 @@ export class BookingsService {
       notes: rest.notes,
       workout: workoutId || undefined,
       isPrivate: !!rest.isPrivate,
+      isInterview: !!rest.isInterview,
       firstStartTime: startTime,
       // Se resta una semana para que el bucle de generación (que siempre
       // arranca en generatedUntil + 1 semana) empiece justo en firstStartTime.
@@ -107,6 +112,7 @@ export class BookingsService {
         notes: series.notes,
         workout: series.workout,
         isPrivate: series.isPrivate,
+        isInterview: series.isInterview,
         series: series._id as any,
         holidaySkip: await this.isHoliday(cursor),
       });
@@ -279,6 +285,7 @@ export class BookingsService {
     // recurrence tampoco: no se puede convertir una sesión ya creada en
     // una serie (ni al revés) desde aquí.
     const { workoutId, recurrence, ...rest } = data;
+    if (rest.isInterview) rest.isPrivate = true;
     const updatePayload: Record<string, unknown> = { ...rest, startTime, endTime };
     if (workoutId !== undefined) {
       updatePayload.workout = workoutId;

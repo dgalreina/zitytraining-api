@@ -32,6 +32,12 @@ export class Booking extends Document {
   @Prop({ type: Boolean, default: false })
   isPrivate!: boolean;
 
+  // Entrevista con un posible cliente (aún no está en la app, así que no
+  // lleva clientes). Es un caso particular de sesión privada: siempre va
+  // con isPrivate=true y hereda sus reglas; solo cambia cómo se enseña.
+  @Prop({ type: Boolean, default: false })
+  isInterview!: boolean;
+
   // Entrenamiento asignado a esta sesion (opcional). Uno solo por sesion,
   // compartido por todos sus clientes si es dueto/trio.
   @Prop({ type: Types.ObjectId, ref: 'Workout', required: false })

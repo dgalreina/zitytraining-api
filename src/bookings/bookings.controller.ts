@@ -32,8 +32,9 @@ export class BookingsController {
   @Roles(Role.ADMIN, Role.TRAINER)
   @Post()
   create(@Req() req: any, @Body() body: CreateBookingDto) {
-    // Una sesión privada siempre es de quien la crea, no se elige entrenador.
-    if (body.isPrivate) {
+    // Una sesión privada (o entrevista) siempre es de quien la crea, no
+    // se elige entrenador.
+    if (body.isPrivate || body.isInterview) {
       body.trainer = req.user.userId;
     }
     return this.bookingsService.create(body);

@@ -26,6 +26,9 @@ export class BookingSeries extends Document {
   @Prop({ type: Boolean, default: false })
   isPrivate!: boolean;
 
+  @Prop({ type: Boolean, default: false })
+  isInterview!: boolean;
+
   // Fecha+hora de la primera sesión: fija el día de la semana y la hora
   // de todas las que le siguen.
   @Prop({ required: true })
