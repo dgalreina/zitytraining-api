@@ -101,12 +101,18 @@ export class PurchasesService {
         );
       }
 
+      // La elección de cómo facturar el último mes es para el plan
+      // mensual que se queda cojo. Si lo que está activo es un puntual
+      // (precio cerrado, no hay nada que elegir), el mensual cojo es el
+      // que ese puntual tenía pausado, y la elección va para él.
+      const isPunctual = !!currentActive.scheduledEndDate;
+
       currentActive.status = PurchaseStatus.CANCELLED;
       currentActive.endedAt = new Date();
       currentActive.endedBy = actorId as any;
       currentActive.endReason = 'changed';
       currentActive.replacedByLabel = data.itemLabel;
-      currentActive.finalMonthBilling = data.finalMonthBilling;
+      currentActive.finalMonthBilling = isPunctual ? undefined : data.finalMonthBilling;
       await currentActive.save();
 
       if (currentActive.pausedPlan) {
@@ -116,6 +122,7 @@ export class PurchasesService {
           endedBy: actorId,
           endReason: 'changed',
           replacedByLabel: data.itemLabel,
+          finalMonthBilling: isPunctual ? data.finalMonthBilling : undefined,
         });
       }
     }
@@ -159,9 +166,11 @@ export class PurchasesService {
 
   // Anula un plan asignado por error. A diferencia de "cancel", aquí no
   // hay último mes que facturar: la idea es que sea como si nunca hubiera
-  // existido. Si estaba tapando otro plan, ese vuelve a estar activo. Lo
-  // que no se hace es resucitar un plan que este hubiera sustituido con
-  // "cambiar plan": eso lo reasigna el admin a mano.
+  // existido. Vale tanto para un plan en curso como para uno ya cerrado
+  // (el error se puede descubrir tarde, al revisar Contabilidad). Si
+  // estaba tapando otro plan, ese vuelve a estar activo. Lo que no se
+  // hace es resucitar un plan que este hubiera sustituido con "cambiar
+  // plan": eso lo reasigna el admin a mano.
   async voidPurchase(id: string, actorId: string): Promise<Purchase> {
     const existing = await this.purchaseModel.findById(id);
     if (!existing) {
@@ -172,8 +181,8 @@ export class PurchasesService {
         'Este plan se pagó por Stripe, no se puede anular desde aquí',
       );
     }
-    if (existing.status !== PurchaseStatus.ACTIVE && existing.status !== PurchaseStatus.PAUSED) {
-      throw new BadRequestException('Solo se puede anular un plan que siga en curso');
+    if (existing.status === PurchaseStatus.VOIDED) {
+      throw new BadRequestException('Este plan ya está anulado');
     }
 
     existing.status = PurchaseStatus.VOIDED;
