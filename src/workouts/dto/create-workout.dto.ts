@@ -8,8 +8,21 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  Min,
   ValidateNested,
 } from 'class-validator';
+
+class WorkoutSetDto {
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  reps?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  weight?: number;
+}
 
 class WorkoutSlotDto {
   @IsMongoId()
@@ -17,8 +30,9 @@ class WorkoutSlotDto {
 
   @IsOptional()
   @IsArray()
-  @IsNumber({}, { each: true })
-  reps?: number[];
+  @ValidateNested({ each: true })
+  @Type(() => WorkoutSetDto)
+  sets?: WorkoutSetDto[];
 
   @IsOptional()
   @IsBoolean()

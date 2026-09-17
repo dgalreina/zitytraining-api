@@ -1,16 +1,29 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 
+// Una serie: repeticiones y peso (kg), los dos opcionales por separado
+// (ej. un rest-pause puede no llevar número, o un ejercicio con peso
+// corporal no lleva kg).
+@Schema({ _id: false })
+export class WorkoutSet {
+  @Prop({ required: false })
+  reps?: number;
+
+  @Prop({ required: false })
+  weight?: number;
+}
+
+export const WorkoutSetSchema = SchemaFactory.createForClass(WorkoutSet);
+
 @Schema({ _id: false })
 export class WorkoutSlot {
   @Prop({ type: Types.ObjectId, ref: 'Exercise', required: true })
   exercise!: Types.ObjectId;
 
-  // Una entrada por serie (ej. [12, 12, 10, 8]), no un numero unico:
-  // cada serie puede tener sus propias repeticiones. No es obligatorio
-  // rellenarlas (ej. un ejercicio a rest-pause puede no llevar numero).
-  @Prop({ type: [Number], default: [] })
-  reps!: number[];
+  // Una entrada por serie, en orden: cada serie puede tener sus propias
+  // repeticiones y su propio peso.
+  @Prop({ type: [WorkoutSetSchema], default: [] })
+  sets!: WorkoutSet[];
 
   // Superserie: marca que este ejercicio va encadenado con el
   // siguiente de la lista (se numeran juntos como 1a, 1b, 1c...).
