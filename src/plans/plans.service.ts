@@ -14,38 +14,43 @@ function formatDuration(minutes: number): string {
 }
 
 // "Sesiones libres" no es un plan que el admin cree/edite a mano: son
-// siempre estas dos duraciones fijas, calculadas al vuelo (no se guardan
-// en la base de datos) a partir del precio por sesión de Entrenamiento
-// personal a 2 días/semana de la misma duración. Así, si el admin cambia
-// ese precio, "Sesiones libres" lo refleja al momento, sin tener que
-// tocar nada más.
+// siempre estas variantes fijas, calculadas al vuelo (no se guardan en
+// la base de datos) a partir del precio por sesión del plan de
+// Entrenamiento personal equivalente (mismos días/semana y duración).
+// Así, si el admin cambia ese precio, "Sesiones libres" lo refleja al
+// momento, sin tener que tocar nada más. Los días/semana aquí solo
+// deciden qué precio por sesión se aplica: las sesiones siguen siendo
+// libres, sin cadencia fija.
+const FREE_SESSIONS_ANCHOR_SESSIONS_PER_WEEK = [2, 3];
 const FREE_SESSIONS_DURATIONS = [60, 40];
 const FREE_SESSIONS_PER_MONTH = 12;
-const FREE_SESSIONS_ANCHOR_SESSIONS_PER_WEEK = 2;
-// Sin cadencia semanal fija; solo de relleno para el tipo, no se enseña.
-const FREE_SESSIONS_PLACEHOLDER_PER_WEEK = 3;
 
 @Injectable()
 export class PlansService {
   constructor(@InjectModel(Plan.name) private planModel: Model<Plan>) {}
 
-  private async buildFreeSessionsPlan(durationMinutes: number): Promise<any | null> {
+  private async buildFreeSessionsPlan(
+    sessionsPerWeek: number,
+    durationMinutes: number,
+  ): Promise<any | null> {
     const anchor = await this.planModel.findOne({
       category: PlanCategory.PERSONAL,
-      sessionsPerWeek: FREE_SESSIONS_ANCHOR_SESSIONS_PER_WEEK,
+      sessionsPerWeek,
       durationMinutes,
     });
     if (!anchor) return null;
 
     const sessionCount = FREE_SESSIONS_PER_MONTH;
     const sessionPrice = anchor.sessionPrice;
+    // El id lleva el prefijo "sesiones-libres-": Contabilidad reconoce
+    // estas compras por él, no cambiarlo.
     return {
-      _id: `sesiones-libres-${durationMinutes}`,
+      _id: `sesiones-libres-${sessionsPerWeek}d-${durationMinutes}`,
       category: PlanCategory.SESIONES_LIBRES,
-      sessionsPerWeek: FREE_SESSIONS_PLACEHOLDER_PER_WEEK,
+      sessionsPerWeek,
       durationMinutes,
       monthlyPrice: Math.round(sessionPrice * sessionCount * 100) / 100,
-      label: `Sesiones libres · ${formatDuration(durationMinutes)}`,
+      label: `Sesiones libres (precio ${sessionsPerWeek} días/sem) · ${formatDuration(durationMinutes)}`,
       sessionPrice,
       sessionCount,
     };
@@ -53,7 +58,9 @@ export class PlansService {
 
   private async buildFreeSessionsPlans(): Promise<any[]> {
     const plans = await Promise.all(
-      FREE_SESSIONS_DURATIONS.map((d) => this.buildFreeSessionsPlan(d)),
+      FREE_SESSIONS_ANCHOR_SESSIONS_PER_WEEK.flatMap((spw) =>
+        FREE_SESSIONS_DURATIONS.map((d) => this.buildFreeSessionsPlan(spw, d)),
+      ),
     );
     return plans.filter((p): p is NonNullable<typeof p> => p !== null);
   }

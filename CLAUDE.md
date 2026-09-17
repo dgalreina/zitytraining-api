@@ -7,8 +7,9 @@ aparte (carpeta hermana `zitytraining-web`).
 
 - **"Sesiones libres" no existe como `Plan` en la base de datos.** Se
   construye al vuelo y su `Purchase` lleva un `itemId` sintético
-  `sesiones-libres-<duracion>`, nunca un `ObjectId`. Para reconocerla,
-  mirar ese prefijo; nunca el texto de `itemLabel`.
+  `sesiones-libres-<dias>d-<duracion>` (compras antiguas:
+  `sesiones-libres-<duracion>`), nunca un `ObjectId`. Para reconocerla,
+  mirar el prefijo `sesiones-libres-`; nunca el texto de `itemLabel`.
 
 - **Los planes mensuales siempre empiezan el día 1 y se cobran enteros.**
   Un plan puntual va de día 1 a día 1, y si abarca varios meses se cobra

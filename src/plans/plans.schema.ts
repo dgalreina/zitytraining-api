@@ -7,8 +7,8 @@ export enum PlanCategory {
   TRIO = 'trio',
   // Bono de hasta 12 sesiones al mes, sin cadencia fija ni número fijo de
   // personas por sesión. El precio no lo pone el admin: se calcula solo
-  // a partir del plan de Entrenamiento personal a 2 días/semana de la
-  // misma duración (ver plans.service.ts).
+  // a partir del plan de Entrenamiento personal equivalente (2 o 3
+  // días/semana, misma duración; ver plans.service.ts).
   SESIONES_LIBRES = 'sesiones_libres',
 }
 
