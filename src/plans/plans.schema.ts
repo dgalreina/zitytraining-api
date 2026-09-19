@@ -5,9 +5,9 @@ export enum PlanCategory {
   PERSONAL = 'personal',
   DUO = 'duo',
   TRIO = 'trio',
-  // Bono de hasta 12 sesiones al mes, sin cadencia fija ni número fijo de
-  // personas por sesión. El precio no lo pone el admin: se calcula solo
-  // a partir del plan de Entrenamiento personal equivalente (2 o 3
+  // Bono de hasta 12 sesiones al mes, sin cadencia fija. El precio no lo
+  // pone el admin: se calcula solo a partir del plan normal equivalente
+  // (personal, dúo o trío, según cuánta gente comparta la sesión; 2 o 3
   // días/semana, misma duración; ver plans.service.ts).
   SESIONES_LIBRES = 'sesiones_libres',
 }

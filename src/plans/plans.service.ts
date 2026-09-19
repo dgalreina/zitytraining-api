@@ -15,26 +15,38 @@ function formatDuration(minutes: number): string {
 
 // "Sesiones libres" no es un plan que el admin cree/edite a mano: son
 // siempre estas variantes fijas, calculadas al vuelo (no se guardan en
-// la base de datos) a partir del precio por sesión del plan de
-// Entrenamiento personal equivalente (mismos días/semana y duración).
+// la base de datos) a partir del precio por sesión del plan normal
+// equivalente (misma categoría, días/semana y duración): personal,
+// dúo o trío, según cuánta gente vaya a compartir la sesión suelta.
 // Así, si el admin cambia ese precio, "Sesiones libres" lo refleja al
 // momento, sin tener que tocar nada más. Los días/semana aquí solo
 // deciden qué precio por sesión se aplica: las sesiones siguen siendo
 // libres, sin cadencia fija.
+const FREE_SESSIONS_ANCHOR_CATEGORIES = [PlanCategory.PERSONAL, PlanCategory.DUO, PlanCategory.TRIO];
 const FREE_SESSIONS_ANCHOR_SESSIONS_PER_WEEK = [2, 3];
 const FREE_SESSIONS_DURATIONS = [60, 40];
 const FREE_SESSIONS_PER_MONTH = 12;
+
+// Cómo se nombra cada variante en el selector, para distinguirlas: la
+// de toda la vida (personal) no lleva apellido, para no romper la
+// costumbre de quien ya la conoce.
+const FREE_SESSIONS_CATEGORY_QUALIFIER: Record<string, string> = {
+  [PlanCategory.PERSONAL]: '',
+  [PlanCategory.DUO]: ' dúo',
+  [PlanCategory.TRIO]: ' trío',
+};
 
 @Injectable()
 export class PlansService {
   constructor(@InjectModel(Plan.name) private planModel: Model<Plan>) {}
 
   private async buildFreeSessionsPlan(
+    anchorCategory: PlanCategory,
     sessionsPerWeek: number,
     durationMinutes: number,
   ): Promise<any | null> {
     const anchor = await this.planModel.findOne({
-      category: PlanCategory.PERSONAL,
+      category: anchorCategory,
       sessionsPerWeek,
       durationMinutes,
     });
@@ -42,15 +54,16 @@ export class PlansService {
 
     const sessionCount = FREE_SESSIONS_PER_MONTH;
     const sessionPrice = anchor.sessionPrice;
+    const qualifier = FREE_SESSIONS_CATEGORY_QUALIFIER[anchorCategory] ?? '';
     // El id lleva el prefijo "sesiones-libres-": Contabilidad reconoce
     // estas compras por él, no cambiarlo.
     return {
-      _id: `sesiones-libres-${sessionsPerWeek}d-${durationMinutes}`,
+      _id: `sesiones-libres-${anchorCategory}-${sessionsPerWeek}d-${durationMinutes}`,
       category: PlanCategory.SESIONES_LIBRES,
       sessionsPerWeek,
       durationMinutes,
       monthlyPrice: Math.round(sessionPrice * sessionCount * 100) / 100,
-      label: `Sesiones libres (precio ${sessionsPerWeek} días/sem) · ${formatDuration(durationMinutes)}`,
+      label: `Sesiones libres${qualifier} (precio ${sessionsPerWeek} días/sem) · ${formatDuration(durationMinutes)}`,
       sessionPrice,
       sessionCount,
     };
@@ -58,8 +71,10 @@ export class PlansService {
 
   private async buildFreeSessionsPlans(): Promise<any[]> {
     const plans = await Promise.all(
-      FREE_SESSIONS_ANCHOR_SESSIONS_PER_WEEK.flatMap((spw) =>
-        FREE_SESSIONS_DURATIONS.map((d) => this.buildFreeSessionsPlan(spw, d)),
+      FREE_SESSIONS_ANCHOR_CATEGORIES.flatMap((category) =>
+        FREE_SESSIONS_ANCHOR_SESSIONS_PER_WEEK.flatMap((spw) =>
+          FREE_SESSIONS_DURATIONS.map((d) => this.buildFreeSessionsPlan(category, spw, d)),
+        ),
       ),
     );
     return plans.filter((p): p is NonNullable<typeof p> => p !== null);
