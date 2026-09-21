@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -22,6 +22,8 @@ function hashToken(token: string): string {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private usersService: UsersService,
     private jwtService: JwtService,
@@ -103,7 +105,7 @@ export class AuthService {
 
     if (!existing || existing.expiresAt.getTime() < Date.now()) {
       // TODO: quitar este log de depuración cuando se confirme que el refresco funciona bien.
-      console.log('[refresh-token] intento con token invalido o caducado');
+      this.logger.log('[refresh-token] intento con token invalido o caducado');
       throw new UnauthorizedException('Sesión caducada, inicia sesión de nuevo');
     }
 
@@ -111,13 +113,13 @@ export class AuthService {
     if (!user || user.status !== UserStatus.ACTIVE) {
       await existing.deleteOne();
       // TODO: quitar este log de depuración cuando se confirme que el refresco funciona bien.
-      console.log('[refresh-token] usuario ya no valido, se rechaza el refresco');
+      this.logger.log('[refresh-token] usuario ya no valido, se rechaza el refresco');
       throw new UnauthorizedException('Sesión caducada, inicia sesión de nuevo');
     }
 
     await existing.deleteOne();
     // TODO: quitar este log de depuración cuando se confirme que el refresco funciona bien.
-    console.log(`[refresh-token] rotado correctamente para ${user.email || user._id} a las ${new Date().toISOString()}`);
+    this.logger.log(`[refresh-token] rotado correctamente para ${user.email || user._id} a las ${new Date().toISOString()}`);
     return this.issueTokens(user);
   }
 
