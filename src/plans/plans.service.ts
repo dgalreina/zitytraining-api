@@ -60,6 +60,9 @@ export class PlansService {
     return {
       _id: `sesiones-libres-${anchorCategory}-${sessionsPerWeek}d-${durationMinutes}`,
       category: PlanCategory.SESIONES_LIBRES,
+      // De dónde sale el precio (personal/dúo/trío): el front la usa solo
+      // para agrupar el selector, no para nada de negocio.
+      anchorCategory,
       sessionsPerWeek,
       durationMinutes,
       monthlyPrice: Math.round(sessionPrice * sessionCount * 100) / 100,
