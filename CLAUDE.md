@@ -30,6 +30,14 @@ aparte (carpeta hermana `zitytraining-web`).
   en la base de datos. Evita llamarlo dentro de un bucle por cliente;
   su filtro acepta varios de golpe.
 
+- **Una clase semanal nunca se repite sumando milisegundos fijos.** El
+  gimnasio está en Madrid, que cambia de horario dos veces al año: sumar
+  `7 * 24h` en milisegundos mantiene igual la hora UTC pero desplaza la
+  hora de pared en cuanto de por medio hay un cambio de horario (fue un
+  bug real: una clase de las 10:25 pasaba a las 9:25 sola en octubre).
+  Usar siempre `addWeeksKeepingLocalTime` (`bookings/timezone.ts`), que
+  suma semanas en el huso horario del gimnasio.
+
 ## Convenciones
 
 - Comentarios en español, y explicando el **porqué**, no el qué. Si el

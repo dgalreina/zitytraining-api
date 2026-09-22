@@ -11,6 +11,7 @@ import { BookingSeries } from './booking-series.schema';
 import { Holiday } from '../holidays/holidays.schema';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { UpdateBookingDto } from './dto/update-booking.dto';
+import { addWeeksKeepingLocalTime } from './timezone';
 
 // Un solo nivel de populate no basta: dentro del workout hace falta el
 // nombre/categoria de cada ejercicio para poder pintarlo (icono, etc.)
@@ -85,7 +86,7 @@ export class BookingsService {
       firstStartTime: startTime,
       // Se resta una semana para que el bucle de generación (que siempre
       // arranca en generatedUntil + 1 semana) empiece justo en firstStartTime.
-      generatedUntil: new Date(startTime.getTime() - WEEK_MS),
+      generatedUntil: addWeeksKeepingLocalTime(startTime, -1),
     });
     await series.save();
 
@@ -101,7 +102,7 @@ export class BookingsService {
   private async generateSeriesOccurrences(series: BookingSeries, until: Date): Promise<void> {
     const durationMs = series.durationMinutes * 60000;
     const docs: Partial<Booking>[] = [];
-    let cursor = new Date(series.generatedUntil.getTime() + WEEK_MS);
+    let cursor = addWeeksKeepingLocalTime(series.generatedUntil, 1);
 
     while (cursor.getTime() <= until.getTime() && (!series.endDate || cursor < series.endDate)) {
       docs.push({
@@ -116,7 +117,7 @@ export class BookingsService {
         series: series._id as any,
         holidaySkip: await this.isHoliday(cursor),
       });
-      cursor = new Date(cursor.getTime() + WEEK_MS);
+      cursor = addWeeksKeepingLocalTime(cursor, 1);
     }
 
     if (docs.length > 0) {
