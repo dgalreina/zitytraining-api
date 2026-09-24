@@ -1,7 +1,8 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { TimeEntry } from './attendance.schema';
+import { UpdateTimeEntryDto } from './dto/update-time-entry.dto';
 
 const AUTO_CLOCK_OUT_HOUR = 22;
 
@@ -103,6 +104,44 @@ export class AttendanceService {
     }
     const created = new this.timeEntryModel({ trainer: trainerId, clockIn: start, clockOut: end, manual: true });
     return created.save();
+  }
+
+  // Corrige un fichaje ya guardado (p.ej. una hora mal fichada). Cada
+  // entrenador solo puede tocar los suyos; el admin, cualquiera.
+  async update(
+    id: string,
+    requestingUserId: string,
+    isAdmin: boolean,
+    data: UpdateTimeEntryDto,
+  ): Promise<TimeEntry> {
+    const existing = await this.timeEntryModel.findById(id);
+    if (!existing) {
+      throw new NotFoundException('Fichaje no encontrado');
+    }
+    if (!isAdmin && existing.trainer.toString() !== requestingUserId) {
+      throw new ForbiddenException('No puedes modificar el fichaje de otro entrenador');
+    }
+
+    const clockIn = data.clockIn ? new Date(data.clockIn) : existing.clockIn;
+    const clockOut = data.clockOut ? new Date(data.clockOut) : existing.clockOut;
+    if (clockOut && clockOut.getTime() <= clockIn.getTime()) {
+      throw new BadRequestException('La hora de salida debe ser posterior a la de entrada');
+    }
+
+    existing.clockIn = clockIn;
+    existing.clockOut = clockOut;
+    return existing.save();
+  }
+
+  async remove(id: string, requestingUserId: string, isAdmin: boolean): Promise<void> {
+    const existing = await this.timeEntryModel.findById(id);
+    if (!existing) {
+      throw new NotFoundException('Fichaje no encontrado');
+    }
+    if (!isAdmin && existing.trainer.toString() !== requestingUserId) {
+      throw new ForbiddenException('No puedes borrar el fichaje de otro entrenador');
+    }
+    await this.timeEntryModel.findByIdAndDelete(id);
   }
 
   async getStatus(trainerId: string): Promise<{ clockedIn: boolean; since?: Date }> {

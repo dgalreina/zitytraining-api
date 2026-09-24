@@ -1,6 +1,7 @@
-import { Body, Controller, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { AttendanceService } from './attendance.service';
 import { CreateManualEntryDto } from './dto/create-manual-entry.dto';
+import { UpdateTimeEntryDto } from './dto/update-time-entry.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -30,6 +31,25 @@ export class AttendanceController {
   @Post('manual')
   createManual(@Req() req: any, @Body() body: CreateManualEntryDto) {
     return this.attendanceService.createManual(req.user.userId, body.clockIn, body.clockOut);
+  }
+
+  // Corregir o borrar un fichaje ya guardado (p.ej. una hora equivocada).
+  // El propio entrenador solo puede tocar los suyos; el admin, cualquiera
+  // (comprobado dentro del service).
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.TRAINER)
+  @Patch(':id')
+  update(@Req() req: any, @Param('id') id: string, @Body() body: UpdateTimeEntryDto) {
+    const isAdmin = req.user.roles?.includes(Role.ADMIN);
+    return this.attendanceService.update(id, req.user.userId, isAdmin, body);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.TRAINER)
+  @Delete(':id')
+  remove(@Req() req: any, @Param('id') id: string) {
+    const isAdmin = req.user.roles?.includes(Role.ADMIN);
+    return this.attendanceService.remove(id, req.user.userId, isAdmin);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
