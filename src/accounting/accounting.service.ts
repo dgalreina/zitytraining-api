@@ -8,10 +8,11 @@ import { Purchase, PurchaseStatus, PurchaseType, FinalMonthBilling } from '../pu
 import { BookingsService } from '../bookings/bookings.service';
 import { Booking } from '../bookings/bookings.schema';
 
-// De dónde sale el importe de un tramo: el precio del plan entero, las
-// sesiones dadas dentro del tramo, o nada (el admin decidió no cobrar
-// ese último mes).
-type SegmentBasis = 'full_month' | 'sessions' | 'none';
+// De dónde sale el importe de un tramo: el precio del plan entero, el
+// precio del plan entero más las sesiones de más que no entraban en su
+// cupo semanal (cobradas como sueltas), las sesiones dadas dentro del
+// tramo, o nada (el admin decidió no cobrar ese último mes).
+type SegmentBasis = 'full_month' | 'full_month_plus_extra' | 'sessions' | 'none';
 
 interface PurchaseSpan {
   purchase: Purchase;
@@ -186,6 +187,8 @@ export class AccountingService {
       let amount: number;
       let basis: SegmentBasis;
       let sessions: number | null = null;
+      let extraSessions: number | null = null;
+      let extraAmount: number | null = null;
 
       if (span.isFreeSessions) {
         sessions = sessionsInRange(span.fromDay, span.toDay);
@@ -194,6 +197,23 @@ export class AccountingService {
       } else if (span.coversFullMonth) {
         amount = span.purchase.price;
         basis = 'full_month';
+
+        // Un plan cerrado tiene un cupo fijo de sesiones al mes
+        // (sesiones/semana × 4, guardado en sessionCount al asignarlo).
+        // Si el cliente viene a más, esas de más se cobran aparte, al
+        // mismo precio por sesión que tendría un bono de sesiones
+        // libres equivalente (misma cuenta: precio del plan ÷ su cupo).
+        if (span.purchase.sessionCount) {
+          const given = sessionsInRange(span.fromDay, span.toDay);
+          const extra = given - span.purchase.sessionCount;
+          if (extra > 0) {
+            sessions = given;
+            extraSessions = extra;
+            extraAmount = extra * pricePerSession;
+            amount += extraAmount;
+            basis = 'full_month_plus_extra';
+          }
+        }
       } else {
         // Tramo de mes cojo (el plan se paró/cambió a mitad de mes): el
         // admin ya eligió cómo se factura al pararlo/cambiarlo. Sin
@@ -226,7 +246,11 @@ export class AccountingService {
         basis,
         sessions,
         pricePerSession:
-          basis === 'sessions' ? Math.round(pricePerSession * 100) / 100 : null,
+          basis === 'sessions' || basis === 'full_month_plus_extra'
+            ? Math.round(pricePerSession * 100) / 100
+            : null,
+        extraSessions,
+        extraAmount: extraAmount !== null ? Math.round(extraAmount * 100) / 100 : null,
       };
     });
 
