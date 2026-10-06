@@ -11,13 +11,25 @@ import { UpdatePurchaseDatesDto } from './dto/update-purchase-dates.dto';
 
 @Injectable()
 export class PurchasesService {
-  private stripe: Stripe;
+  private stripeClient: Stripe | null = null;
 
   constructor(
     @InjectModel(Purchase.name) private purchaseModel: Model<Purchase>,
     private configService: ConfigService,
-  ) {
-    this.stripe = new Stripe(this.configService.get<string>('STRIPE_SECRET_KEY')!);
+  ) {}
+
+  // Perezoso a propósito: mientras nadie compre por Stripe (ahora mismo
+  // los clientes no pueden ni entrar en la app), no hace falta tener la
+  // clave configurada para que la API arranque.
+  private get stripe(): Stripe {
+    if (!this.stripeClient) {
+      const key = this.configService.get<string>('STRIPE_SECRET_KEY');
+      if (!key) {
+        throw new BadRequestException('Stripe no está configurado en este entorno');
+      }
+      this.stripeClient = new Stripe(key);
+    }
+    return this.stripeClient;
   }
 
   async create(clientId: string, data: CreatePurchaseDto): Promise<Purchase> {
