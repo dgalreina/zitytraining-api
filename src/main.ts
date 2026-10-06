@@ -35,6 +35,7 @@ async function bootstrap() {
     origin: [
       'http://localhost:3000',
       'https://zitytraining-web-6tkjf.ondigitalocean.app',
+      'https://zitytraining-prod-web-rwzju.ondigitalocean.app',
     ],
   });
   await app.listen(process.env.PORT ?? 3001);
