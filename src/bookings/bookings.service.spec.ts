@@ -203,3 +203,47 @@ describe('BookingsService.removeSeriesFrom', () => {
     );
   });
 });
+
+describe('BookingsService.ensureSeriesGenerated (privado) — ampliar una serie ya existente', () => {
+  it('genera solo las ocurrencias que faltan a partir de donde se quedó, no desde el principio', async () => {
+    const bookingModel = makeBookingModelMock();
+    const holidayModel = makeHolidayModelMock();
+    const seriesModel = makeSeriesModelMock();
+
+    const existingSeries: any = {
+      _id: 'series-existente',
+      trainer: 't1',
+      clients: ['c1'],
+      durationMinutes: 60,
+      isPrivate: false,
+      isInterview: false,
+      generatedUntil: new Date('2024-06-03T08:00:00.000Z'), // ya generada hasta aquí
+      save: jest.fn().mockResolvedValue(undefined),
+    };
+    seriesModel.find.mockResolvedValue([existingSeries]);
+
+    const service = new BookingsService(bookingModel, seriesModel, holidayModel as any);
+
+    // Pide hasta el 24 de junio: la serie solo llega generada hasta el 3,
+    // así que hay que ampliarla.
+    const rangeEnd = '2024-06-24T00:00:00.000Z';
+    await (service as any).ensureSeriesGenerated({ trainer: 't1' }, rangeEnd);
+
+    expect(seriesModel.find).toHaveBeenCalledWith({
+      trainer: 't1',
+      generatedUntil: { $lt: new Date(rangeEnd) },
+      $or: [{ endDate: { $exists: false } }, { endDate: { $gt: new Date(rangeEnd) } }],
+    });
+
+    expect(bookingModel.insertMany).toHaveBeenCalledTimes(1);
+    const docs = bookingModel.insertMany.mock.calls[0][0] as any[];
+    // La primera ocurrencia nueva es la semana siguiente a donde se quedó
+    // (3 de junio + 1 semana = 10 de junio): no vuelve a generar el 3.
+    expect(docs[0].startTime.toISOString()).toBe('2024-06-10T08:00:00.000Z');
+    expect(docs.every((d) => d.series === 'series-existente')).toBe(true);
+
+    // generatedUntil queda por delante de lo pedido (rangeEnd + colchón).
+    expect(existingSeries.generatedUntil.getTime()).toBeGreaterThan(new Date(rangeEnd).getTime());
+    expect(existingSeries.save).toHaveBeenCalledTimes(1);
+  });
+});

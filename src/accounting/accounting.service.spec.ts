@@ -171,3 +171,94 @@ describe('AccountingService.buildClientMonth (finalMonthBilling)', () => {
     expect(result.segments[0].amount).toBe(120 + 2 * pricePerSession);
   });
 });
+
+describe('AccountingService.coverageIntervals (privado) — pausas por un puntual', () => {
+  it('con una pausa, el plan cubre antes y después, pero no durante', () => {
+    const service = makeService();
+    const plan = makePurchase({
+      _id: 'plan-1' as any,
+      activatedAt: new Date(Date.UTC(2024, 5, 1)),
+    });
+    const punctual = makePurchase({
+      _id: 'punt-1' as any,
+      pausedPlan: 'plan-1' as any,
+      activatedAt: new Date(Date.UTC(2024, 5, 10)),
+      endedAt: new Date(Date.UTC(2024, 5, 15)),
+    });
+
+    const intervals = (service as any).coverageIntervals(plan, [plan, punctual]);
+
+    expect(intervals).toEqual([
+      { start: Date.UTC(2024, 5, 1), end: Date.UTC(2024, 5, 10) },
+      { start: Date.UTC(2024, 5, 15), end: Infinity },
+    ]);
+  });
+
+  it('con dos pausas seguidas en el mismo mes, saca tres tramos sin solaparse ni perder ninguno', () => {
+    const service = makeService();
+    const plan = makePurchase({
+      _id: 'plan-1' as any,
+      activatedAt: new Date(Date.UTC(2024, 5, 1)),
+    });
+    const punctualA = makePurchase({
+      _id: 'punt-a' as any,
+      pausedPlan: 'plan-1' as any,
+      activatedAt: new Date(Date.UTC(2024, 5, 5)),
+      endedAt: new Date(Date.UTC(2024, 5, 10)),
+    });
+    const punctualB = makePurchase({
+      _id: 'punt-b' as any,
+      pausedPlan: 'plan-1' as any,
+      activatedAt: new Date(Date.UTC(2024, 5, 15)),
+      endedAt: new Date(Date.UTC(2024, 5, 20)),
+    });
+
+    const intervals = (service as any).coverageIntervals(plan, [plan, punctualA, punctualB]);
+
+    expect(intervals).toEqual([
+      { start: Date.UTC(2024, 5, 1), end: Date.UTC(2024, 5, 5) },
+      { start: Date.UTC(2024, 5, 10), end: Date.UTC(2024, 5, 15) },
+      { start: Date.UTC(2024, 5, 20), end: Infinity },
+    ]);
+  });
+
+  it('un plan pausado dos veces en el mismo mes se sigue facturando como mes completo si empieza el día 1 y llega hasta fin de mes', () => {
+    const service = makeService();
+    const monthStart = new Date(Date.UTC(2024, 5, 1));
+    const monthEndExclusive = new Date(Date.UTC(2024, 6, 1));
+    const daysInMonth = 30;
+
+    const plan = makePurchase({
+      _id: 'plan-1' as any,
+      itemLabel: 'Plan mensual',
+      activatedAt: new Date(Date.UTC(2024, 4, 1)), // activo desde mayo
+      price: 120,
+    });
+    const punctualA = makePurchase({
+      itemLabel: 'Puntual A',
+      pausedPlan: 'plan-1' as any,
+      activatedAt: new Date(Date.UTC(2024, 5, 5)),
+      endedAt: new Date(Date.UTC(2024, 5, 10)),
+    });
+    const punctualB = makePurchase({
+      itemLabel: 'Puntual B',
+      pausedPlan: 'plan-1' as any,
+      activatedAt: new Date(Date.UTC(2024, 5, 15)),
+      endedAt: new Date(Date.UTC(2024, 5, 20)),
+    });
+
+    const result: any = (service as any).buildClientMonth(
+      makeClient(),
+      monthStart,
+      monthEndExclusive,
+      daysInMonth,
+      [plan, punctualA, punctualB],
+      [],
+      null,
+    );
+
+    const planSegment = result.segments.find((s: any) => s.label === 'Plan mensual');
+    expect(planSegment.basis).toBe('full_month');
+    expect(planSegment.amount).toBe(120);
+  });
+});
