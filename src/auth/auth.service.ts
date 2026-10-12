@@ -134,10 +134,14 @@ export class AuthService {
   // cualquiera podría averiguar qué direcciones están dadas de alta
   // probando una a una.
   async forgotPassword(email: string): Promise<{ success: true }> {
-    const user = await this.userModel.findOne({
-      email: email.toLowerCase().trim(),
-      status: UserStatus.ACTIVE,
-    });
+    const user = await this.userModel
+      .findOne({
+        email: email.trim(),
+        status: UserStatus.ACTIVE,
+      })
+      // Case-insensitive, igual que en findByEmail: emails antiguos
+      // pueden tener mayúsculas tal como se escribieron al darlos de alta.
+      .collation({ locale: 'es', strength: 2 });
 
     // Sin contraseña es que nunca ha entrado (clientes dados de alta a
     // mano): no hay nada que recuperar.

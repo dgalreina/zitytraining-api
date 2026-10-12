@@ -22,6 +22,7 @@ export class UsersService {
     const hashedPassword = await bcrypt.hash(data.password, 10);
     const created = new this.userModel({
       ...data,
+      email: data.email.trim().toLowerCase(),
       password: hashedPassword,
       roles: [Role.CLIENT],
       status: UserStatus.ACTIVE,
@@ -40,6 +41,7 @@ export class UsersService {
   try {
     const created = new this.userModel({
       ...data,
+      email: data.email ? data.email.trim().toLowerCase() : data.email,
       password: hashedPassword,
       status: UserStatus.ACTIVE,
       // Quien entra en la app tendrá que elegir su propia contraseña la
@@ -59,7 +61,10 @@ export class UsersService {
 
   async update(id: string, data: UpdateUserDto): Promise<User> {
   try {
-    const user = await this.userModel.findByIdAndUpdate(id, data, { new: true });
+    const payload = data.email
+      ? { ...data, email: data.email.trim().toLowerCase() }
+      : data;
+    const user = await this.userModel.findByIdAndUpdate(id, payload, { new: true });
     if (!user) {
       throw new NotFoundException(`User with id ${id} not found`);
     }
@@ -179,7 +184,10 @@ export class UsersService {
   // borrado, comparaba contra su contraseña vieja y rechazaba al bueno.
   async findByEmail(email: string): Promise<User | null> {
     return this.userModel
-      .findOne({ email, status: { $ne: UserStatus.DELETED } })
+      .findOne({ email: email.trim(), status: { $ne: UserStatus.DELETED } })
+      // Case-insensitive: emails antiguos pueden tener mayúsculas tal
+      // como se escribieron al darlos de alta (antes de normalizar aquí).
+      .collation({ locale: 'es', strength: 2 })
       .exec();
   }
 
