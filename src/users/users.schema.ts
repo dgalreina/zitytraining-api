@@ -32,8 +32,10 @@ export class User extends Document {
   @Prop({ required: true })
   lastName!: string;
 
-  @Prop({ required: true })
-  dateOfBirth!: Date;
+  // Ya no es obligatoria ni para cliente ni para admin/entrenador: se pide
+  // al dar de alta, pero si no se tiene a mano se puede dejar en blanco.
+  @Prop({ required: false })
+  dateOfBirth?: Date;
 
   // Solo obligatorio para admin/entrenador (se valida en el DTO); un
   // cliente puede no tener email. La unicidad se define abajo, con un

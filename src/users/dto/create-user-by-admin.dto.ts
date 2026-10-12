@@ -17,8 +17,9 @@ export class CreateUserByAdminDto {
   @IsNotEmpty()
   lastName!: string;
 
+  @IsOptional()
   @IsDateString()
-  dateOfBirth!: string;
+  dateOfBirth?: string;
 
   // Obligatorio para admin/entrenador; para un cliente es opcional (no
   // puede entrar en la app todavía), pero si se da igualmente tiene que
