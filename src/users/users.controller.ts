@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   Param,
   Patch,
@@ -30,10 +31,20 @@ export class UsersController {
     return this.usersService.create(body); // público, registro de clientes
   }
 
+  // Igual que listar clientes (ver findActiveClients más abajo): los
+  // entrenadores también dan de alta a sus propios clientes, no solo el
+  // admin. Pero dar de alta a OTRO admin/entrenador sigue siendo cosa
+  // exclusiva del admin: sin este filtro, un entrenador podría usar esta
+  // misma ruta (con roles: ['admin']) para crearse a sí mismo una cuenta
+  // de más privilegio.
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.TRAINER)
   @Post('admin')
-  createByAdmin(@Body() body: CreateUserByAdminDto) {
+  createByAdmin(@Req() req: any, @Body() body: CreateUserByAdminDto) {
+    const isAdmin = req.user.roles?.includes(Role.ADMIN);
+    if (!isAdmin && (body.roles.length !== 1 || body.roles[0] !== Role.CLIENT)) {
+      throw new ForbiddenException('Solo un admin puede dar de alta a otro admin o entrenador');
+    }
     return this.usersService.createByAdmin(body);
   }
 
