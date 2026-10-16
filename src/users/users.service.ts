@@ -143,7 +143,7 @@ export class UsersService {
     const [clients, trainer] = await Promise.all([
       this.userModel
         .find({ roles: Role.CLIENT, status: UserStatus.ACTIVE })
-        .select('firstName lastName status')
+        .select('firstName lastName email dateOfBirth status')
         .lean()
         .exec(),
       this.userModel.findById(trainerId).select('favoriteClients').lean().exec(),
