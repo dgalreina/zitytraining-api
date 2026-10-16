@@ -16,4 +16,13 @@ export class UpdateBookingDto extends PartialType(CreateBookingDto) {
   @IsOptional()
   @IsBoolean()
   holidaySkip?: boolean;
+
+  // Solo tiene efecto si esta sesión pertenece a una serie y además se
+  // manda workoutId: aplica el entrenamiento (o su borrado) también a
+  // las demás sesiones ya generadas de la serie a partir de esta fecha,
+  // y a la plantilla de la serie, para que las que se generen más
+  // adelante también lo lleven.
+  @IsOptional()
+  @IsBoolean()
+  applyWorkoutToSeries?: boolean;
 }

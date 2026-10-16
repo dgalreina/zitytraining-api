@@ -21,6 +21,7 @@ function makeBookingModelMock() {
   Ctor.findOne = jest.fn().mockReturnValue({ sort: jest.fn().mockResolvedValue({ _id: 'first' }) });
   Ctor.findById = jest.fn();
   Ctor.deleteMany = jest.fn().mockResolvedValue({ deletedCount: 0 });
+  Ctor.updateMany = jest.fn().mockResolvedValue({ modifiedCount: 0 });
   Ctor.findByIdAndDelete = jest.fn();
   Ctor.findByIdAndUpdate = jest.fn().mockReturnValue({
     populate: () => ({
@@ -361,5 +362,108 @@ describe('BookingsService.update — convertir una sesión puntual en semanal', 
 
     expect(seriesModel).not.toHaveBeenCalled();
     expect(bookingModel.insertMany).not.toHaveBeenCalled();
+  });
+});
+
+describe('BookingsService.update — aplicar el entrenamiento a "esta y todas las futuras"', () => {
+  it('con applyWorkoutToSeries, actualiza las sesiones futuras ya generadas y la plantilla de la serie', async () => {
+    const bookingModel = makeBookingModelMock();
+    const seriesModel = makeSeriesModelMock();
+    const holidayModel = makeHolidayModelMock();
+    const existing: any = {
+      _id: 'b1',
+      isPrivate: false,
+      trainer: { toString: () => 't1' },
+      clients: ['c1'],
+      series: 'series-x',
+      startTime: new Date('2024-06-03T08:00:00.000Z'),
+      endTime: new Date('2024-06-03T09:00:00.000Z'),
+    };
+    bookingModel.findById.mockResolvedValue(existing);
+    const service = new BookingsService(bookingModel, seriesModel, holidayModel as any);
+
+    await service.update(
+      'b1',
+      { workoutId: 'workout-nuevo', applyWorkoutToSeries: true } as any,
+      't1',
+    );
+
+    expect(bookingModel.updateMany).toHaveBeenCalledWith(
+      { series: 'series-x', startTime: { $gte: existing.startTime }, _id: { $ne: 'b1' } },
+      { workout: 'workout-nuevo' },
+    );
+    expect(seriesModel.findByIdAndUpdate).toHaveBeenCalledWith('series-x', { workout: 'workout-nuevo' });
+  });
+
+  it('también propaga el borrado del entrenamiento (workoutId null) a la serie', async () => {
+    const bookingModel = makeBookingModelMock();
+    const seriesModel = makeSeriesModelMock();
+    const holidayModel = makeHolidayModelMock();
+    const existing: any = {
+      _id: 'b1',
+      isPrivate: false,
+      trainer: { toString: () => 't1' },
+      clients: ['c1'],
+      series: 'series-x',
+      startTime: new Date('2024-06-03T08:00:00.000Z'),
+      endTime: new Date('2024-06-03T09:00:00.000Z'),
+    };
+    bookingModel.findById.mockResolvedValue(existing);
+    const service = new BookingsService(bookingModel, seriesModel, holidayModel as any);
+
+    await service.update('b1', { workoutId: null, applyWorkoutToSeries: true } as any, 't1');
+
+    expect(bookingModel.updateMany).toHaveBeenCalledWith(
+      expect.anything(),
+      { workout: null },
+    );
+    expect(seriesModel.findByIdAndUpdate).toHaveBeenCalledWith('series-x', { workout: null });
+  });
+
+  it('sin applyWorkoutToSeries, el cambio de entrenamiento se queda solo en esta sesión', async () => {
+    const bookingModel = makeBookingModelMock();
+    const seriesModel = makeSeriesModelMock();
+    const holidayModel = makeHolidayModelMock();
+    const existing: any = {
+      _id: 'b1',
+      isPrivate: false,
+      trainer: { toString: () => 't1' },
+      clients: ['c1'],
+      series: 'series-x',
+      startTime: new Date('2024-06-03T08:00:00.000Z'),
+      endTime: new Date('2024-06-03T09:00:00.000Z'),
+    };
+    bookingModel.findById.mockResolvedValue(existing);
+    const service = new BookingsService(bookingModel, seriesModel, holidayModel as any);
+
+    await service.update('b1', { workoutId: 'workout-nuevo' } as any, 't1');
+
+    expect(bookingModel.updateMany).not.toHaveBeenCalled();
+    expect(seriesModel.findByIdAndUpdate).not.toHaveBeenCalled();
+  });
+
+  it('applyWorkoutToSeries no hace nada si la sesión no pertenece a ninguna serie', async () => {
+    const bookingModel = makeBookingModelMock();
+    const seriesModel = makeSeriesModelMock();
+    const holidayModel = makeHolidayModelMock();
+    const existing: any = {
+      _id: 'b1',
+      isPrivate: false,
+      trainer: { toString: () => 't1' },
+      clients: ['c1'],
+      series: null,
+      startTime: new Date('2024-06-03T08:00:00.000Z'),
+      endTime: new Date('2024-06-03T09:00:00.000Z'),
+    };
+    bookingModel.findById.mockResolvedValue(existing);
+    const service = new BookingsService(bookingModel, seriesModel, holidayModel as any);
+
+    await service.update(
+      'b1',
+      { workoutId: 'workout-nuevo', applyWorkoutToSeries: true } as any,
+      't1',
+    );
+
+    expect(bookingModel.updateMany).not.toHaveBeenCalled();
   });
 });

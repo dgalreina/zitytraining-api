@@ -283,7 +283,7 @@ export class BookingsService {
 
     // workoutId no forma parte del schema (el campo se llama "workout");
     // se traduce aparte. undefined = no tocar, null o id = reemplazar.
-    const { workoutId, recurrence, ...rest } = data;
+    const { workoutId, recurrence, applyWorkoutToSeries, ...rest } = data;
     if (rest.isInterview) rest.isPrivate = true;
     const updatePayload: Record<string, unknown> = { ...rest, startTime, endTime };
     if (workoutId !== undefined) {
@@ -322,6 +322,20 @@ export class BookingsService {
       .populate('clients', 'firstName lastName phone')
       .populate(WORKOUT_POPULATE)
       .exec();
+
+    // "Esta y todas las futuras": además de esta sesión (ya actualizada
+    // arriba), se aplica el mismo entrenamiento (o su borrado) a las
+    // demás sesiones ya generadas de la serie a partir de esta fecha, y
+    // se deja en la plantilla de la serie para que las que se generen
+    // más adelante también lo lleven.
+    if (applyWorkoutToSeries && existing.series && workoutId !== undefined) {
+      await this.bookingModel.updateMany(
+        { series: existing.series, startTime: { $gte: startTime }, _id: { $ne: id } },
+        { workout: workoutId },
+      );
+      await this.seriesModel.findByIdAndUpdate(existing.series, { workout: workoutId });
+    }
+
     return updated!;
   }
 
