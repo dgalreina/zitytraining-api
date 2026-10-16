@@ -283,13 +283,37 @@ export class BookingsService {
 
     // workoutId no forma parte del schema (el campo se llama "workout");
     // se traduce aparte. undefined = no tocar, null o id = reemplazar.
-    // recurrence tampoco: no se puede convertir una sesión ya creada en
-    // una serie (ni al revés) desde aquí.
     const { workoutId, recurrence, ...rest } = data;
     if (rest.isInterview) rest.isPrivate = true;
     const updatePayload: Record<string, unknown> = { ...rest, startTime, endTime };
     if (workoutId !== undefined) {
       updatePayload.workout = workoutId;
+    }
+
+    // Convertir una sesión puntual en semanal: solo tiene sentido si
+    // todavía no pertenece a ninguna serie (si ya es de una, ya es
+    // semanal; no hay "al revés" desde aquí). Esta misma sesión pasa a
+    // ser la primera ocurrencia, con la fecha/hora ya actualizada más
+    // arriba; el resto de semanas se generan a partir de la siguiente.
+    if (recurrence === 'weekly' && !existing.series) {
+      const durationMinutes = Math.round((endTime.getTime() - startTime.getTime()) / 60000);
+      const series = new this.seriesModel({
+        trainer: updatePayload.trainer ?? existing.trainer,
+        clients: updatePayload.clients ?? existing.clients,
+        durationMinutes,
+        notes: updatePayload.notes ?? existing.notes,
+        workout: updatePayload.workout !== undefined ? updatePayload.workout : existing.workout,
+        isPrivate: updatePayload.isPrivate ?? existing.isPrivate,
+        isInterview: updatePayload.isInterview ?? existing.isInterview,
+        firstStartTime: startTime,
+        generatedUntil: startTime,
+      });
+      await series.save();
+      updatePayload.series = series._id;
+      await this.generateSeriesOccurrences(
+        series,
+        new Date(startTime.getTime() + SERIES_GENERATION_BUFFER_MS),
+      );
     }
 
     const updated = await this.bookingModel

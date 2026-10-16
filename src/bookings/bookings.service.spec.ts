@@ -22,6 +22,13 @@ function makeBookingModelMock() {
   Ctor.findById = jest.fn();
   Ctor.deleteMany = jest.fn().mockResolvedValue({ deletedCount: 0 });
   Ctor.findByIdAndDelete = jest.fn();
+  Ctor.findByIdAndUpdate = jest.fn().mockReturnValue({
+    populate: () => ({
+      populate: () => ({
+        populate: () => ({ exec: () => Promise.resolve({ _id: 'updated' }) }),
+      }),
+    }),
+  });
   return Ctor;
 }
 
@@ -245,5 +252,114 @@ describe('BookingsService.ensureSeriesGenerated (privado) — ampliar una serie 
     // generatedUntil queda por delante de lo pedido (rangeEnd + colchón).
     expect(existingSeries.generatedUntil.getTime()).toBeGreaterThan(new Date(rangeEnd).getTime());
     expect(existingSeries.save).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('BookingsService.update — convertir una sesión puntual en semanal', () => {
+  it('con recurrence weekly y sin serie previa, crea la serie a partir de esta sesión y genera las semanas siguientes', async () => {
+    const bookingModel = makeBookingModelMock();
+    const seriesModel = makeSeriesModelMock();
+    const holidayModel = makeHolidayModelMock();
+    const existing: any = {
+      _id: 'b1',
+      isPrivate: false,
+      trainer: { toString: () => 't1' },
+      clients: ['c1'],
+      notes: 'nota original',
+      workout: undefined,
+      series: null,
+      startTime: new Date('2024-06-03T08:00:00.000Z'),
+      endTime: new Date('2024-06-03T09:00:00.000Z'),
+    };
+    bookingModel.findById.mockResolvedValue(existing);
+    const service = new BookingsService(bookingModel, seriesModel, holidayModel as any);
+
+    await service.update(
+      'b1',
+      {
+        trainer: 't1',
+        clients: ['c1'],
+        startTime: '2024-06-03T08:00:00.000Z',
+        endTime: '2024-06-03T09:00:00.000Z',
+        recurrence: 'weekly',
+      } as any,
+      't1',
+    );
+
+    // La serie se crea con esta misma sesión como primera ocurrencia: no
+    // se genera otra vez el 3 de junio, generatedUntil ya cubre esa fecha.
+    expect(seriesModel).toHaveBeenCalledTimes(1);
+    const seriesData = seriesModel.mock.calls[0][0];
+    expect(seriesData.firstStartTime).toEqual(new Date('2024-06-03T08:00:00.000Z'));
+    expect(seriesData.generatedUntil).toEqual(new Date('2024-06-03T08:00:00.000Z'));
+    expect(seriesData.trainer).toBe('t1');
+
+    // Se generan las semanas siguientes (10 de junio en adelante).
+    expect(bookingModel.insertMany).toHaveBeenCalledTimes(1);
+    const docs = bookingModel.insertMany.mock.calls[0][0] as any[];
+    expect(docs[0].startTime.toISOString()).toBe('2024-06-10T08:00:00.000Z');
+
+    // La propia sesión editada queda enlazada a la serie nueva.
+    expect(bookingModel.findByIdAndUpdate).toHaveBeenCalledWith(
+      'b1',
+      expect.objectContaining({ series: 'series-1' }),
+      { new: true },
+    );
+  });
+
+  it('si la sesión ya pertenece a una serie, recurrence weekly no crea una serie duplicada', async () => {
+    const bookingModel = makeBookingModelMock();
+    const seriesModel = makeSeriesModelMock();
+    const holidayModel = makeHolidayModelMock();
+    const existing: any = {
+      _id: 'b1',
+      isPrivate: false,
+      trainer: { toString: () => 't1' },
+      clients: ['c1'],
+      series: 'series-ya-existente',
+      startTime: new Date('2024-06-03T08:00:00.000Z'),
+      endTime: new Date('2024-06-03T09:00:00.000Z'),
+    };
+    bookingModel.findById.mockResolvedValue(existing);
+    const service = new BookingsService(bookingModel, seriesModel, holidayModel as any);
+
+    await service.update(
+      'b1',
+      {
+        startTime: '2024-06-03T08:00:00.000Z',
+        endTime: '2024-06-03T09:00:00.000Z',
+        recurrence: 'weekly',
+      } as any,
+      't1',
+    );
+
+    expect(seriesModel).not.toHaveBeenCalled();
+    expect(bookingModel.insertMany).not.toHaveBeenCalled();
+  });
+
+  it('sin recurrence (o "once"), una edición normal no toca ninguna serie', async () => {
+    const bookingModel = makeBookingModelMock();
+    const seriesModel = makeSeriesModelMock();
+    const holidayModel = makeHolidayModelMock();
+    const existing: any = {
+      _id: 'b1',
+      isPrivate: false,
+      trainer: { toString: () => 't1' },
+      clients: ['c1'],
+      series: null,
+      startTime: new Date('2024-06-03T08:00:00.000Z'),
+      endTime: new Date('2024-06-03T09:00:00.000Z'),
+    };
+    bookingModel.findById.mockResolvedValue(existing);
+    const service = new BookingsService(bookingModel, seriesModel, holidayModel as any);
+
+    await service.update(
+      'b1',
+      { notes: 'solo cambio la nota' } as any,
+      't1',
+    );
+
+    expect(seriesModel).not.toHaveBeenCalled();
+    expect(bookingModel.insertMany).not.toHaveBeenCalled();
   });
 });
