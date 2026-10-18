@@ -11,12 +11,15 @@ function makeSeriesModelMock() {
     this.save = jest.fn().mockResolvedValue(this);
   });
   Ctor.find = jest.fn();
+  Ctor.findById = jest.fn();
   Ctor.findByIdAndUpdate = jest.fn().mockResolvedValue(null);
   return Ctor;
 }
 
 function makeBookingModelMock() {
   const Ctor: any = jest.fn();
+  Ctor.find = jest.fn().mockResolvedValue([]);
+  Ctor.bulkWrite = jest.fn().mockResolvedValue({});
   Ctor.insertMany = jest.fn().mockResolvedValue([]);
   Ctor.findOne = jest.fn().mockReturnValue({ sort: jest.fn().mockResolvedValue({ _id: 'first' }) });
   Ctor.findById = jest.fn();
@@ -465,5 +468,113 @@ describe('BookingsService.update — aplicar el entrenamiento a "esta y todas la
     );
 
     expect(bookingModel.updateMany).not.toHaveBeenCalled();
+  });
+});
+
+describe('BookingsService.update — mover "esta y todas las futuras" (arrastrar una sesión de una serie)', () => {
+  function buildExisting() {
+    return {
+      _id: 'b1',
+      isPrivate: false,
+      trainer: { toString: () => 't1' },
+      clients: ['c1'],
+      series: 'series-x',
+      startTime: new Date('2024-06-03T08:00:00.000Z'), // lunes 10:00 Madrid
+      endTime: new Date('2024-06-03T09:00:00.000Z'),
+    };
+  }
+
+  it('con applyTimeToSeries, traslada las sesiones futuras ya generadas al mismo día/hora y reancla la serie', async () => {
+    const bookingModel = makeBookingModelMock();
+    const seriesModel = makeSeriesModelMock();
+    const holidayModel = makeHolidayModelMock();
+    const existing: any = buildExisting();
+    bookingModel.findById.mockResolvedValue(existing);
+
+    const futura: any = {
+      _id: 'b2',
+      startTime: new Date('2024-06-10T08:00:00.000Z'), // lunes siguiente, 10:00 Madrid
+      endTime: new Date('2024-06-10T09:00:00.000Z'),
+    };
+    bookingModel.find.mockResolvedValue([futura]);
+
+    const serieDoc: any = {
+      generatedUntil: new Date('2024-11-25T08:00:00.000Z'),
+      save: jest.fn().mockResolvedValue(undefined),
+    };
+    seriesModel.findById.mockResolvedValue(serieDoc);
+
+    const service = new BookingsService(bookingModel, seriesModel, holidayModel as any);
+
+    await service.update(
+      'b1',
+      {
+        startTime: '2024-06-04T09:00:00.000Z', // martes 11:00 Madrid (se mueve 1 día + 1 hora)
+        endTime: '2024-06-04T10:00:00.000Z',
+        applyTimeToSeries: true,
+      } as any,
+      't1',
+    );
+
+    expect(bookingModel.find).toHaveBeenCalledWith({
+      series: 'series-x',
+      startTime: { $gte: existing.startTime },
+      _id: { $ne: 'b1' },
+    });
+    expect(bookingModel.bulkWrite).toHaveBeenCalledWith([
+      {
+        updateOne: {
+          filter: { _id: 'b2' },
+          update: {
+            // martes siguiente, 11:00 Madrid
+            startTime: new Date('2024-06-11T09:00:00.000Z'),
+            endTime: new Date('2024-06-11T10:00:00.000Z'),
+          },
+        },
+      },
+    ]);
+    expect(serieDoc.generatedUntil).toEqual(new Date('2024-11-26T10:00:00.000Z'));
+    expect(serieDoc.save).toHaveBeenCalled();
+  });
+
+  it('sin applyTimeToSeries, mover la sesión no toca a las demás de la serie', async () => {
+    const bookingModel = makeBookingModelMock();
+    const seriesModel = makeSeriesModelMock();
+    const holidayModel = makeHolidayModelMock();
+    const existing: any = buildExisting();
+    bookingModel.findById.mockResolvedValue(existing);
+    const service = new BookingsService(bookingModel, seriesModel, holidayModel as any);
+
+    await service.update(
+      'b1',
+      { startTime: '2024-06-04T09:00:00.000Z', endTime: '2024-06-04T10:00:00.000Z' } as any,
+      't1',
+    );
+
+    expect(bookingModel.find).not.toHaveBeenCalled();
+    expect(bookingModel.bulkWrite).not.toHaveBeenCalled();
+    expect(seriesModel.findById).not.toHaveBeenCalled();
+  });
+
+  it('applyTimeToSeries no hace nada si la sesión no pertenece a ninguna serie', async () => {
+    const bookingModel = makeBookingModelMock();
+    const seriesModel = makeSeriesModelMock();
+    const holidayModel = makeHolidayModelMock();
+    const existing: any = { ...buildExisting(), series: null };
+    bookingModel.findById.mockResolvedValue(existing);
+    const service = new BookingsService(bookingModel, seriesModel, holidayModel as any);
+
+    await service.update(
+      'b1',
+      {
+        startTime: '2024-06-04T09:00:00.000Z',
+        endTime: '2024-06-04T10:00:00.000Z',
+        applyTimeToSeries: true,
+      } as any,
+      't1',
+    );
+
+    expect(bookingModel.find).not.toHaveBeenCalled();
+    expect(bookingModel.bulkWrite).not.toHaveBeenCalled();
   });
 });

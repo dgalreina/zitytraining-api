@@ -25,4 +25,13 @@ export class UpdateBookingDto extends PartialType(CreateBookingDto) {
   @IsOptional()
   @IsBoolean()
   applyWorkoutToSeries?: boolean;
+
+  // Solo tiene efecto si esta sesión pertenece a una serie y además se
+  // manda un startTime nuevo: aplica el mismo cambio de día/hora a las
+  // demás sesiones ya generadas de la serie a partir de esta fecha (antes
+  // de moverla), y deja la serie anclada al nuevo patrón para las que se
+  // generen más adelante.
+  @IsOptional()
+  @IsBoolean()
+  applyTimeToSeries?: boolean;
 }

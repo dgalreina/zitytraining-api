@@ -11,7 +11,7 @@ import { BookingSeries } from './booking-series.schema';
 import { Holiday } from '../holidays/holidays.schema';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { UpdateBookingDto } from './dto/update-booking.dto';
-import { addWeeksKeepingLocalTime } from './timezone';
+import { addWeeksKeepingLocalTime, shiftKeepingWeekPattern } from './timezone';
 
 // Un solo nivel de populate no basta: dentro del workout hace falta el
 // nombre/categoria de cada ejercicio para poder pintarlo (icono, etc.)
@@ -283,7 +283,7 @@ export class BookingsService {
 
     // workoutId no forma parte del schema (el campo se llama "workout");
     // se traduce aparte. undefined = no tocar, null o id = reemplazar.
-    const { workoutId, recurrence, applyWorkoutToSeries, ...rest } = data;
+    const { workoutId, recurrence, applyWorkoutToSeries, applyTimeToSeries, ...rest } = data;
     if (rest.isInterview) rest.isPrivate = true;
     const updatePayload: Record<string, unknown> = { ...rest, startTime, endTime };
     if (workoutId !== undefined) {
@@ -334,6 +334,37 @@ export class BookingsService {
         { workout: workoutId },
       );
       await this.seriesModel.findByIdAndUpdate(existing.series, { workout: workoutId });
+    }
+
+    // "Esta y todas las futuras", pero para el día/hora: las sesiones que
+    // ya estaban generadas se desplazan al mismo día de la semana y hora
+    // a la que se acaba de mover esta (no las pasadas), y la serie se
+    // reancla a ese patrón para las que falten por generar.
+    if (applyTimeToSeries && existing.series && data.startTime) {
+      const series = await this.seriesModel.findById(existing.series);
+      if (series) {
+        const futureBookings = await this.bookingModel.find({
+          series: existing.series,
+          startTime: { $gte: existing.startTime },
+          _id: { $ne: id },
+        });
+        if (futureBookings.length > 0) {
+          await this.bookingModel.bulkWrite(
+            futureBookings.map((b) => {
+              const newStart = shiftKeepingWeekPattern(b.startTime, existing.startTime, startTime);
+              const newEnd = new Date(newStart.getTime() + (b.endTime.getTime() - b.startTime.getTime()));
+              return {
+                updateOne: {
+                  filter: { _id: b._id },
+                  update: { startTime: newStart, endTime: newEnd },
+                },
+              };
+            }),
+          );
+        }
+        series.generatedUntil = shiftKeepingWeekPattern(series.generatedUntil, existing.startTime, startTime);
+        await series.save();
+      }
     }
 
     return updated!;

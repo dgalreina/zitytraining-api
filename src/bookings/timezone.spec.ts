@@ -1,4 +1,4 @@
-import { addWeeksKeepingLocalTime } from './timezone';
+import { addWeeksKeepingLocalTime, shiftKeepingWeekPattern } from './timezone';
 
 describe('addWeeksKeepingLocalTime', () => {
   it('mantiene la hora de pared en Madrid al cruzar el fin del horario de verano (octubre)', () => {
@@ -32,5 +32,35 @@ describe('addWeeksKeepingLocalTime', () => {
     const anterior = addWeeksKeepingLocalTime(despuesDelCambio, -1);
 
     expect(anterior.toISOString()).toBe('2024-10-20T08:25:00.000Z'); // 10:25 en Madrid (UTC+2)
+  });
+});
+
+describe('shiftKeepingWeekPattern', () => {
+  it('traslada una fecha al mismo día/hora de la semana que marca el ancla nueva', () => {
+    const anclaVieja = new Date('2024-06-03T08:00:00.000Z'); // lunes 10:00 Madrid (UTC+2)
+    const anclaNueva = new Date('2024-06-04T09:00:00.000Z'); // martes 11:00 Madrid (UTC+2)
+    const fecha = new Date('2024-06-10T08:00:00.000Z'); // lunes 10:00 Madrid (UTC+2)
+
+    const resultado = shiftKeepingWeekPattern(fecha, anclaVieja, anclaNueva);
+
+    expect(resultado.toISOString()).toBe('2024-06-11T09:00:00.000Z'); // martes 11:00 Madrid
+  });
+
+  it('respeta la hora de pared aunque el día que se traslada cruce el cambio de horario (a diferencia de un desplazamiento fijo en milisegundos)', () => {
+    // El ancla (sábado 10:00 -> domingo 11:00) cae justo en el fin de
+    // semana del cambio de horario de octubre de 2024, así que la
+    // diferencia en milisegundos entre ambas anclas no es "1 día + 1
+    // hora" sino "1 día + 2 horas" (ese domingo tiene 25 horas). Aplicar
+    // ese delta fijo a una fecha de dos semanas antes, que no cruza
+    // ningún cambio de horario, daría una hora de más.
+    const anclaVieja = new Date('2024-10-26T08:00:00.000Z'); // sábado 10:00 Madrid (UTC+2, CEST)
+    const anclaNueva = new Date('2024-10-27T10:00:00.000Z'); // domingo 11:00 Madrid (UTC+1, CET)
+    const fecha = new Date('2024-10-12T08:00:00.000Z'); // sábado 10:00 Madrid (UTC+2, CEST)
+
+    const resultado = shiftKeepingWeekPattern(fecha, anclaVieja, anclaNueva);
+
+    // domingo 13/10, todavía en CEST: 11:00 Madrid son las 09:00 UTC (no
+    // las 10:00 que daría sumar el delta de milisegundos del ancla).
+    expect(resultado.toISOString()).toBe('2024-10-13T09:00:00.000Z');
   });
 });
