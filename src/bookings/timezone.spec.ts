@@ -1,4 +1,4 @@
-import { addWeeksKeepingLocalTime, shiftKeepingWeekPattern } from './timezone';
+import { addWeeksKeepingLocalTime, atMadridHour, parseMadridDateTime, shiftKeepingWeekPattern } from './timezone';
 
 describe('addWeeksKeepingLocalTime', () => {
   it('mantiene la hora de pared en Madrid al cruzar el fin del horario de verano (octubre)', () => {
@@ -62,5 +62,27 @@ describe('shiftKeepingWeekPattern', () => {
     // domingo 13/10, todavía en CEST: 11:00 Madrid son las 09:00 UTC (no
     // las 10:00 que daría sumar el delta de milisegundos del ancla).
     expect(resultado.toISOString()).toBe('2024-10-13T09:00:00.000Z');
+  });
+});
+
+describe('parseMadridDateTime', () => {
+  it('interpreta un texto "YYYY-MM-DDTHH:mm" sin zona como hora de Madrid, no la del servidor (el bug real del fichaje manual: en producción el servidor va en UTC)', () => {
+    const resultado = parseMadridDateTime('2026-10-19T09:00');
+    expect(resultado.toISOString()).toBe('2026-10-19T07:00:00.000Z'); // 09:00 Madrid (CEST, UTC+2)
+  });
+
+  it('respeta el cambio de horario: la misma hora de pared en invierno cae una hora más tarde en UTC', () => {
+    const resultado = parseMadridDateTime('2026-12-19T09:00');
+    expect(resultado.toISOString()).toBe('2026-12-19T08:00:00.000Z'); // 09:00 Madrid (CET, UTC+1)
+  });
+});
+
+describe('atMadridHour', () => {
+  it('fija la hora indicada en el día que le toca EN MADRID, no en la zona del servidor', () => {
+    // 23:30 UTC del día 18 ya son las 01:30 del día 19 en Madrid (CEST):
+    // "las 22:00 de ese día" tiene que caer en el 19, no en el 18.
+    const fichaje = new Date('2026-10-18T23:30:00.000Z');
+    const resultado = atMadridHour(fichaje, 22);
+    expect(resultado.toISOString()).toBe('2026-10-19T20:00:00.000Z'); // 22:00 Madrid (CEST) del día 19
   });
 });

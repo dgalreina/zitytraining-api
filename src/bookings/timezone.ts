@@ -30,3 +30,23 @@ export function shiftKeepingWeekPattern(date: Date, oldAnchor: Date, newAnchor: 
     .set({ hour: newLocal.hour, minute: newLocal.minute, second: 0, millisecond: 0 })
     .toJSDate();
 }
+
+// Los formularios de fichaje manual mandan la fecha/hora tal cual se ve
+// en pantalla ("2024-06-03T09:00", sin zona horaria). `new Date(...)`
+// interpreta eso como hora local del SERVIDOR, no del gimnasio: en local
+// coincide (el dev corre en Madrid), pero en producción el servidor va en
+// UTC, así que un fichaje de las 09:00 se guardaba como 09:00 UTC (las
+// 11:00 en Madrid) en vez de las 07:00 UTC que tocan. Esto lo interpreta
+// siempre como hora de Madrid, sea cual sea la zona del servidor.
+export function parseMadridDateTime(value: string): Date {
+  return DateTime.fromISO(value, { zone: GYM_TIMEZONE }).toJSDate();
+}
+
+// Mismo problema que parseMadridDateTime pero al revés: para calcular
+// "las 22:00 de ese día" hace falta saber qué día es EN MADRID (no en el
+// servidor) y fijar la hora en esa misma zona.
+export function atMadridHour(date: Date, hour: number): Date {
+  return DateTime.fromJSDate(date, { zone: GYM_TIMEZONE })
+    .set({ hour, minute: 0, second: 0, millisecond: 0 })
+    .toJSDate();
+}

@@ -3,13 +3,12 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { TimeEntry } from './attendance.schema';
 import { UpdateTimeEntryDto } from './dto/update-time-entry.dto';
+import { atMadridHour, parseMadridDateTime } from '../bookings/timezone';
 
 const AUTO_CLOCK_OUT_HOUR = 22;
 
 function cutoffFor(date: Date): Date {
-  const cutoff = new Date(date);
-  cutoff.setHours(AUTO_CLOCK_OUT_HOUR, 0, 0, 0);
-  return cutoff;
+  return atMadridHour(date, AUTO_CLOCK_OUT_HOUR);
 }
 
 @Injectable()
@@ -75,7 +74,7 @@ export class AttendanceService {
       if (!open) {
         throw new BadRequestException('No tienes ninguna entrada fichada para poder cerrarla');
       }
-      const end = new Date(clockOut!);
+      const end = parseMadridDateTime(clockOut!);
       if (isNaN(end.getTime()) || end.getTime() <= open.clockIn.getTime()) {
         throw new BadRequestException('La hora de salida debe ser posterior a la de entrada');
       }
@@ -84,7 +83,7 @@ export class AttendanceService {
       return open.save();
     }
 
-    const start = new Date(clockIn);
+    const start = parseMadridDateTime(clockIn);
     if (isNaN(start.getTime())) {
       throw new BadRequestException('La hora de entrada no es válida');
     }
@@ -98,7 +97,7 @@ export class AttendanceService {
       return created.save();
     }
 
-    const end = new Date(clockOut);
+    const end = parseMadridDateTime(clockOut);
     if (isNaN(end.getTime()) || end.getTime() <= start.getTime()) {
       throw new BadRequestException('La hora de salida debe ser posterior a la de entrada');
     }
@@ -122,8 +121,8 @@ export class AttendanceService {
       throw new ForbiddenException('No puedes modificar el fichaje de otro entrenador');
     }
 
-    const clockIn = data.clockIn ? new Date(data.clockIn) : existing.clockIn;
-    const clockOut = data.clockOut ? new Date(data.clockOut) : existing.clockOut;
+    const clockIn = data.clockIn ? parseMadridDateTime(data.clockIn) : existing.clockIn;
+    const clockOut = data.clockOut ? parseMadridDateTime(data.clockOut) : existing.clockOut;
     if (clockOut && clockOut.getTime() <= clockIn.getTime()) {
       throw new BadRequestException('La hora de salida debe ser posterior a la de entrada');
     }
