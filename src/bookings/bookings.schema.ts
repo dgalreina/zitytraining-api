@@ -53,6 +53,14 @@ export class Booking extends Document {
   // por si esa clase concreta sí se dio pese al festivo.
   @Prop({ type: Boolean, default: false })
   holidaySkip!: boolean;
+
+  // Esta sesión recupera una clase debida: no cuenta en Contabilidad para
+  // NINGUNO de sus clientes (si se cancela o se da, es para todo el
+  // grupo, no para uno suelto). Al ponerse (crear o editar), se da por
+  // recuperada la más antigua de las clases debidas de CADA cliente de
+  // la sesión (ver bookings.service).
+  @Prop({ type: Boolean, default: false })
+  isDebtSettlement!: boolean;
 }
 
 export const BookingSchema = SchemaFactory.createForClass(Booking);

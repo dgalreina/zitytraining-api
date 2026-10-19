@@ -409,3 +409,82 @@ describe('AccountingService.bookingsByClient (privado)', () => {
     expect(byClient.get('client-1')).toHaveLength(2);
   });
 });
+
+describe('AccountingService.buildClientMonth — sesión que recupera una clase debida', () => {
+  const monthStart = new Date(Date.UTC(2024, 5, 1));
+  const monthEndExclusive = new Date(Date.UTC(2024, 6, 1));
+  const daysInMonth = 30;
+
+  it('no cuenta ni se cobra para el cliente, y se marca aparte en days (debtSettled)', () => {
+    const service = makeService();
+    const purchase = makePurchase({
+      activatedAt: new Date(Date.UTC(2024, 4, 1)),
+      price: 120,
+      sessionCount: 8,
+    });
+    const bookings = [
+      makeBooking(3),
+      makeBooking(5, { isDebtSettlement: true as any }), // recupera, no cuenta
+    ];
+
+    const result: any = (service as any).buildClientMonth(
+      makeClient(),
+      monthStart,
+      monthEndExclusive,
+      daysInMonth,
+      [purchase],
+      bookings,
+      null,
+    );
+
+    expect(result.sessionCount).toBe(1);
+    expect(result.due).toBe(120); // mes normal, sin sueltas ni descuento
+    const diaRecuperada = result.days.find((d: any) => d.day === 5);
+    expect(diaRecuperada).toMatchObject({ hasClass: false, cancelled: false, debtSettled: true });
+  });
+
+  it('en un dúo, no cuenta para NINGUNO de los dos clientes: se cancela/recupera para todo el grupo', () => {
+    const service = makeService();
+    const purchase = makePurchase({
+      activatedAt: new Date(Date.UTC(2024, 4, 1)),
+      price: 120,
+      sessionCount: 8,
+    });
+    // La misma sesión (mismo booking) pasada como "realBookings" de CADA
+    // cliente: así es como llega de verdad (bookingsByClient reparte el
+    // mismo booking a cada uno de sus clientes).
+    const sharedBooking = makeBooking(5, {
+      clients: ['client-1', 'client-2'] as any,
+      isDebtSettlement: true as any,
+    });
+
+    const resultA: any = (service as any).buildClientMonth(
+      makeClient(),
+      monthStart,
+      monthEndExclusive,
+      daysInMonth,
+      [purchase],
+      [sharedBooking],
+      null,
+    );
+    expect(resultA.days.find((d: any) => d.day === 5)).toMatchObject({
+      hasClass: false,
+      debtSettled: true,
+    });
+
+    const otherClient = { ...makeClient(), _id: 'client-2' } as any;
+    const resultB: any = (service as any).buildClientMonth(
+      otherClient,
+      monthStart,
+      monthEndExclusive,
+      daysInMonth,
+      [purchase],
+      [sharedBooking],
+      null,
+    );
+    expect(resultB.days.find((d: any) => d.day === 5)).toMatchObject({
+      hasClass: false,
+      debtSettled: true,
+    });
+  });
+});

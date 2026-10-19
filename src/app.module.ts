@@ -17,6 +17,7 @@ import { HolidaysModule } from './holidays/holidays.module';
 import { AccountingModule } from './accounting/accounting.module';
 import { RemindersModule } from './reminders/reminders.module';
 import { MailModule } from './mail/mail.module';
+import { OwedSessionsModule } from './owed-sessions/owed-sessions.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { MailModule } from './mail/mail.module';
     HolidaysModule,
     AccountingModule,
     RemindersModule,
+    OwedSessionsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

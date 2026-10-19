@@ -45,6 +45,15 @@ function makeHolidayModelMock(holidayDates: string[] = []) {
   };
 }
 
+function makeOwedSessionsMock() {
+  return { removeOldestForClient: jest.fn().mockResolvedValue(undefined) };
+}
+
+// Compartido por los tests que no les interesa "debida" en absoluto (la
+// mayoría): los que sí lo prueban se montan su propio mock aparte, para
+// no mezclar sus llamadas con las de otros tests.
+const owedSessionsMock = makeOwedSessionsMock();
+
 const baseBooking = {
   trainer: 't1',
   clients: ['c1'],
@@ -56,7 +65,7 @@ describe('BookingsService — generación de series recurrentes', () => {
     const bookingModel = makeBookingModelMock();
     const seriesModel = makeSeriesModelMock();
     const holidayModel = makeHolidayModelMock();
-    const service = new BookingsService(bookingModel, seriesModel, holidayModel as any);
+    const service = new BookingsService(bookingModel, seriesModel, holidayModel as any, owedSessionsMock as any);
 
     await service.create({
       ...baseBooking,
@@ -85,7 +94,7 @@ describe('BookingsService — generación de series recurrentes', () => {
     const bookingModel = makeBookingModelMock();
     const seriesModel = makeSeriesModelMock();
     const holidayModel = makeHolidayModelMock();
-    const service = new BookingsService(bookingModel, seriesModel, holidayModel as any);
+    const service = new BookingsService(bookingModel, seriesModel, holidayModel as any, owedSessionsMock as any);
 
     await service.create({
       ...baseBooking,
@@ -114,7 +123,7 @@ describe('BookingsService — generación de series recurrentes', () => {
       this.endDate = new Date('2024-06-24T08:00:00.000Z'); // corta justo en la 4ª ocurrencia (semana 3)
       this.save = jest.fn().mockResolvedValue(this);
     });
-    const service = new BookingsService(bookingModel, seriesModel, holidayModel as any);
+    const service = new BookingsService(bookingModel, seriesModel, holidayModel as any, owedSessionsMock as any);
 
     await service.create({
       ...baseBooking,
@@ -139,7 +148,7 @@ describe('BookingsService — generación de series recurrentes', () => {
       this.endDate = new Date('2024-06-24T08:00:00.000Z');
       this.save = jest.fn().mockResolvedValue(this);
     });
-    const service = new BookingsService(bookingModel, seriesModel, holidayModel as any);
+    const service = new BookingsService(bookingModel, seriesModel, holidayModel as any, owedSessionsMock as any);
 
     await service.create({
       ...baseBooking,
@@ -164,7 +173,7 @@ describe('BookingsService.removeSeriesFrom', () => {
       startTime: new Date('2024-06-10T08:00:00.000Z'),
     };
     bookingModel.findById.mockResolvedValue(existing);
-    const service = new BookingsService(bookingModel, seriesModel, {} as any);
+    const service = new BookingsService(bookingModel, seriesModel, {} as any, owedSessionsMock as any);
 
     await service.removeSeriesFrom('b1', 't1');
 
@@ -188,7 +197,7 @@ describe('BookingsService.removeSeriesFrom', () => {
       startTime: new Date('2024-06-10T08:00:00.000Z'),
     };
     bookingModel.findById.mockResolvedValue(existing);
-    const service = new BookingsService(bookingModel, seriesModel, {} as any);
+    const service = new BookingsService(bookingModel, seriesModel, {} as any, owedSessionsMock as any);
 
     await service.removeSeriesFrom('b1', 't1');
 
@@ -207,7 +216,7 @@ describe('BookingsService.removeSeriesFrom', () => {
       startTime: new Date('2024-06-10T08:00:00.000Z'),
     };
     bookingModel.findById.mockResolvedValue(existing);
-    const service = new BookingsService(bookingModel, seriesModel, {} as any);
+    const service = new BookingsService(bookingModel, seriesModel, {} as any, owedSessionsMock as any);
 
     await expect(service.removeSeriesFrom('b1', 'otro-usuario')).rejects.toThrow(
       'No puedes borrar una sesión privada de otro usuario',
@@ -233,7 +242,7 @@ describe('BookingsService.ensureSeriesGenerated (privado) — ampliar una serie 
     };
     seriesModel.find.mockResolvedValue([existingSeries]);
 
-    const service = new BookingsService(bookingModel, seriesModel, holidayModel as any);
+    const service = new BookingsService(bookingModel, seriesModel, holidayModel as any, owedSessionsMock as any);
 
     // Pide hasta el 24 de junio: la serie solo llega generada hasta el 3,
     // así que hay que ampliarla.
@@ -276,7 +285,7 @@ describe('BookingsService.update — convertir una sesión puntual en semanal', 
       endTime: new Date('2024-06-03T09:00:00.000Z'),
     };
     bookingModel.findById.mockResolvedValue(existing);
-    const service = new BookingsService(bookingModel, seriesModel, holidayModel as any);
+    const service = new BookingsService(bookingModel, seriesModel, holidayModel as any, owedSessionsMock as any);
 
     await service.update(
       'b1',
@@ -325,7 +334,7 @@ describe('BookingsService.update — convertir una sesión puntual en semanal', 
       endTime: new Date('2024-06-03T09:00:00.000Z'),
     };
     bookingModel.findById.mockResolvedValue(existing);
-    const service = new BookingsService(bookingModel, seriesModel, holidayModel as any);
+    const service = new BookingsService(bookingModel, seriesModel, holidayModel as any, owedSessionsMock as any);
 
     await service.update(
       'b1',
@@ -355,7 +364,7 @@ describe('BookingsService.update — convertir una sesión puntual en semanal', 
       endTime: new Date('2024-06-03T09:00:00.000Z'),
     };
     bookingModel.findById.mockResolvedValue(existing);
-    const service = new BookingsService(bookingModel, seriesModel, holidayModel as any);
+    const service = new BookingsService(bookingModel, seriesModel, holidayModel as any, owedSessionsMock as any);
 
     await service.update(
       'b1',
@@ -383,7 +392,7 @@ describe('BookingsService.update — aplicar el entrenamiento a "esta y todas la
       endTime: new Date('2024-06-03T09:00:00.000Z'),
     };
     bookingModel.findById.mockResolvedValue(existing);
-    const service = new BookingsService(bookingModel, seriesModel, holidayModel as any);
+    const service = new BookingsService(bookingModel, seriesModel, holidayModel as any, owedSessionsMock as any);
 
     await service.update(
       'b1',
@@ -412,7 +421,7 @@ describe('BookingsService.update — aplicar el entrenamiento a "esta y todas la
       endTime: new Date('2024-06-03T09:00:00.000Z'),
     };
     bookingModel.findById.mockResolvedValue(existing);
-    const service = new BookingsService(bookingModel, seriesModel, holidayModel as any);
+    const service = new BookingsService(bookingModel, seriesModel, holidayModel as any, owedSessionsMock as any);
 
     await service.update('b1', { workoutId: null, applyWorkoutToSeries: true } as any, 't1');
 
@@ -437,7 +446,7 @@ describe('BookingsService.update — aplicar el entrenamiento a "esta y todas la
       endTime: new Date('2024-06-03T09:00:00.000Z'),
     };
     bookingModel.findById.mockResolvedValue(existing);
-    const service = new BookingsService(bookingModel, seriesModel, holidayModel as any);
+    const service = new BookingsService(bookingModel, seriesModel, holidayModel as any, owedSessionsMock as any);
 
     await service.update('b1', { workoutId: 'workout-nuevo' } as any, 't1');
 
@@ -459,7 +468,7 @@ describe('BookingsService.update — aplicar el entrenamiento a "esta y todas la
       endTime: new Date('2024-06-03T09:00:00.000Z'),
     };
     bookingModel.findById.mockResolvedValue(existing);
-    const service = new BookingsService(bookingModel, seriesModel, holidayModel as any);
+    const service = new BookingsService(bookingModel, seriesModel, holidayModel as any, owedSessionsMock as any);
 
     await service.update(
       'b1',
@@ -504,7 +513,7 @@ describe('BookingsService.update — mover "esta y todas las futuras" (arrastrar
     };
     seriesModel.findById.mockResolvedValue(serieDoc);
 
-    const service = new BookingsService(bookingModel, seriesModel, holidayModel as any);
+    const service = new BookingsService(bookingModel, seriesModel, holidayModel as any, owedSessionsMock as any);
 
     await service.update(
       'b1',
@@ -543,7 +552,7 @@ describe('BookingsService.update — mover "esta y todas las futuras" (arrastrar
     const holidayModel = makeHolidayModelMock();
     const existing: any = buildExisting();
     bookingModel.findById.mockResolvedValue(existing);
-    const service = new BookingsService(bookingModel, seriesModel, holidayModel as any);
+    const service = new BookingsService(bookingModel, seriesModel, holidayModel as any, owedSessionsMock as any);
 
     await service.update(
       'b1',
@@ -562,7 +571,7 @@ describe('BookingsService.update — mover "esta y todas las futuras" (arrastrar
     const holidayModel = makeHolidayModelMock();
     const existing: any = { ...buildExisting(), series: null };
     bookingModel.findById.mockResolvedValue(existing);
-    const service = new BookingsService(bookingModel, seriesModel, holidayModel as any);
+    const service = new BookingsService(bookingModel, seriesModel, holidayModel as any, owedSessionsMock as any);
 
     await service.update(
       'b1',
@@ -576,5 +585,118 @@ describe('BookingsService.update — mover "esta y todas las futuras" (arrastrar
 
     expect(bookingModel.find).not.toHaveBeenCalled();
     expect(bookingModel.bulkWrite).not.toHaveBeenCalled();
+  });
+});
+
+describe('BookingsService — marcar una sesión como "debida" (recupera una clase debida)', () => {
+  it('al crear una sesión con isDebtSettlement, se da por recuperada la clase debida más antigua de ese cliente', async () => {
+    const bookingModel = makeBookingModelMock();
+    const seriesModel = makeSeriesModelMock();
+    const holidayModel = makeHolidayModelMock();
+    const owedMock = makeOwedSessionsMock();
+    bookingModel.mockImplementation(function (this: any, data: any) {
+      Object.assign(this, data);
+      this.save = jest.fn().mockResolvedValue(this);
+    });
+    const service = new BookingsService(bookingModel, seriesModel, holidayModel as any, owedMock as any);
+
+    await service.create({
+      trainer: 't1',
+      clients: ['c1'],
+      startTime: '2024-06-03T08:00:00.000Z',
+      endTime: '2024-06-03T09:00:00.000Z',
+      isDebtSettlement: true,
+    } as any);
+
+    expect(owedMock.removeOldestForClient).toHaveBeenCalledWith('c1');
+  });
+
+  it('en un dúo, recupera una clase debida de CADA cliente, no solo de uno: la cancelación/recuperación es para todo el grupo', async () => {
+    const bookingModel = makeBookingModelMock();
+    const seriesModel = makeSeriesModelMock();
+    const holidayModel = makeHolidayModelMock();
+    const owedMock = makeOwedSessionsMock();
+    bookingModel.mockImplementation(function (this: any, data: any) {
+      Object.assign(this, data);
+      this.save = jest.fn().mockResolvedValue(this);
+    });
+    const service = new BookingsService(bookingModel, seriesModel, holidayModel as any, owedMock as any);
+
+    await service.create({
+      trainer: 't1',
+      clients: ['c1', 'c2'],
+      startTime: '2024-06-03T08:00:00.000Z',
+      endTime: '2024-06-03T09:00:00.000Z',
+      isDebtSettlement: true,
+    } as any);
+
+    expect(owedMock.removeOldestForClient).toHaveBeenCalledWith('c1');
+    expect(owedMock.removeOldestForClient).toHaveBeenCalledWith('c2');
+    expect(owedMock.removeOldestForClient).toHaveBeenCalledTimes(2);
+  });
+
+  it('al crear una sesión normal (sin isDebtSettlement), no toca la lista de clases debidas', async () => {
+    const bookingModel = makeBookingModelMock();
+    const seriesModel = makeSeriesModelMock();
+    const holidayModel = makeHolidayModelMock();
+    const owedMock = makeOwedSessionsMock();
+    bookingModel.mockImplementation(function (this: any, data: any) {
+      Object.assign(this, data);
+      this.save = jest.fn().mockResolvedValue(this);
+    });
+    const service = new BookingsService(bookingModel, seriesModel, holidayModel as any, owedMock as any);
+
+    await service.create({
+      trainer: 't1',
+      clients: ['c1'],
+      startTime: '2024-06-03T08:00:00.000Z',
+      endTime: '2024-06-03T09:00:00.000Z',
+    } as any);
+
+    expect(owedMock.removeOldestForClient).not.toHaveBeenCalled();
+  });
+
+  it('al editar y poner isDebtSettlement por primera vez, recupera una clase debida', async () => {
+    const bookingModel = makeBookingModelMock();
+    const seriesModel = makeSeriesModelMock();
+    const holidayModel = makeHolidayModelMock();
+    const owedMock = makeOwedSessionsMock();
+    const existing: any = {
+      _id: 'b1',
+      isPrivate: false,
+      trainer: { toString: () => 't1' },
+      clients: ['c1'],
+      startTime: new Date('2024-06-03T08:00:00.000Z'),
+      endTime: new Date('2024-06-03T09:00:00.000Z'),
+      isDebtSettlement: false,
+    };
+    bookingModel.findById.mockResolvedValue(existing);
+    const service = new BookingsService(bookingModel, seriesModel, holidayModel as any, owedMock as any);
+
+    await service.update('b1', { isDebtSettlement: true } as any, 't1');
+
+    expect(owedMock.removeOldestForClient).toHaveBeenCalledWith('c1');
+  });
+
+  it('al volver a guardar una sesión ya marcada como debida, no vuelve a descontar otra', async () => {
+    const bookingModel = makeBookingModelMock();
+    const seriesModel = makeSeriesModelMock();
+    const holidayModel = makeHolidayModelMock();
+    const owedMock = makeOwedSessionsMock();
+    const existing: any = {
+      _id: 'b1',
+      isPrivate: false,
+      trainer: { toString: () => 't1' },
+      clients: ['c1'],
+      startTime: new Date('2024-06-03T08:00:00.000Z'),
+      endTime: new Date('2024-06-03T09:00:00.000Z'),
+      isDebtSettlement: true,
+    };
+    bookingModel.findById.mockResolvedValue(existing);
+    const service = new BookingsService(bookingModel, seriesModel, holidayModel as any, owedMock as any);
+
+    await service.update('b1', { isDebtSettlement: true, notes: 'cambio algo más' } as any, 't1');
+
+    expect(owedMock.removeOldestForClient).not.toHaveBeenCalled();
   });
 });

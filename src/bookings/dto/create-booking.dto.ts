@@ -51,4 +51,11 @@ export class CreateBookingDto {
   @IsOptional()
   @IsIn(['once', 'weekly'])
   recurrence?: 'once' | 'weekly';
+
+  // Marca esta sesión como recuperación de una clase debida: no cuenta en
+  // Contabilidad para ninguno de sus clientes, y a cada uno se le da por
+  // recuperada su clase debida más antigua.
+  @IsOptional()
+  @IsBoolean()
+  isDebtSettlement?: boolean;
 }

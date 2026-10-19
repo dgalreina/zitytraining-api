@@ -12,6 +12,7 @@ import { Holiday } from '../holidays/holidays.schema';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { UpdateBookingDto } from './dto/update-booking.dto';
 import { addWeeksKeepingLocalTime, shiftKeepingWeekPattern } from './timezone';
+import { OwedSessionsService } from '../owed-sessions/owed-sessions.service';
 
 // Un solo nivel de populate no basta: dentro del workout hace falta el
 // nombre/categoria de cada ejercicio para poder pintarlo (icono, etc.)
@@ -33,6 +34,7 @@ export class BookingsService {
     @InjectModel(Booking.name) private bookingModel: Model<Booking>,
     @InjectModel(BookingSeries.name) private seriesModel: Model<BookingSeries>,
     @InjectModel(Holiday.name) private holidayModel: Model<Holiday>,
+    private owedSessionsService: OwedSessionsService,
   ) {}
 
   async create(data: CreateBookingDto): Promise<Booking> {
@@ -60,7 +62,13 @@ export class BookingsService {
       endTime,
       workout: workoutId || undefined,
     });
-    return created.save();
+    const saved = await created.save();
+    if (rest.isDebtSettlement) {
+      // Es para todo el grupo: se da por recuperada la más antigua de
+      // CADA cliente de la sesión, no solo de uno.
+      await Promise.all(clients.map((c) => this.owedSessionsService.removeOldestForClient(c)));
+    }
+    return saved;
   }
 
   // Crea la plantilla de la serie y genera de golpe las primeras
@@ -242,7 +250,7 @@ export class BookingsService {
         startTime: { $lt: new Date(to) },
         endTime: { $gt: new Date(from) },
       })
-      .select('clients startTime status holidaySkip')
+      .select('clients startTime status holidaySkip isDebtSettlement')
       .exec();
   }
 
@@ -313,6 +321,19 @@ export class BookingsService {
       await this.generateSeriesOccurrences(
         series,
         new Date(startTime.getTime() + SERIES_GENERATION_BUFFER_MS),
+      );
+    }
+
+    // Solo se da por recuperada una clase debida la primera vez que se
+    // marca esta sesión como "debida": si ya lo estaba (se está editando
+    // otra cosa de la misma sesión), no se descuenta otra vez. Es para
+    // todo el grupo: se recupera la más antigua de CADA cliente.
+    if (data.isDebtSettlement && !existing.isDebtSettlement) {
+      const settlingClients = ((updatePayload.clients as string[] | undefined) ?? existing.clients).map(
+        (c: any) => c.toString(),
+      );
+      await Promise.all(
+        settlingClients.map((c) => this.owedSessionsService.removeOldestForClient(c)),
       );
     }
 

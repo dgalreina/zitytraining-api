@@ -5,6 +5,7 @@ import { BookingsController } from './bookings.controller';
 import { Booking, BookingSchema } from './bookings.schema';
 import { BookingSeries, BookingSeriesSchema } from './booking-series.schema';
 import { Holiday, HolidaySchema } from '../holidays/holidays.schema';
+import { OwedSessionsModule } from '../owed-sessions/owed-sessions.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { Holiday, HolidaySchema } from '../holidays/holidays.schema';
       { name: BookingSeries.name, schema: BookingSeriesSchema },
       { name: Holiday.name, schema: HolidaySchema },
     ]),
+    OwedSessionsModule,
   ],
   controllers: [BookingsController],
   providers: [BookingsService],

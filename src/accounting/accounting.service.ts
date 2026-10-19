@@ -189,6 +189,11 @@ export class AccountingService {
   ) {
     const clientId = (client._id as any).toString();
 
+    // Esta sesión recupera una clase debida: si se cancela o se da, es
+    // para todo el grupo, así que no cuenta para NINGUNO de sus clientes
+    // (ni para el cupo ni como dada), aunque sea dúo/trío.
+    const isDebtSettled = (b: Booking) => !!b.isDebtSettlement;
+
     const spans = this.overlappingSpans(purchases, monthStart, monthEndExclusive, daysInMonth);
 
     const days = Array.from({ length: daysInMonth }, (_, i) => {
@@ -196,19 +201,25 @@ export class AccountingService {
       const dayBookings = realBookings.filter((b) => b.startTime.getUTCDate() === day);
       return {
         day,
-        hasClass: dayBookings.some((b) => !b.holidaySkip && b.status !== BookingStatus.CANCELLED),
+        hasClass: dayBookings.some(
+          (b) => !b.holidaySkip && b.status !== BookingStatus.CANCELLED && !isDebtSettled(b),
+        ),
         holiday: dayBookings.some((b) => b.holidaySkip),
         // Se cobra igual que una dada (ver sessionsInRange, que no
         // distingue por status), pero se pinta aparte para que se note
         // que no hubo clase de verdad.
-        cancelled: dayBookings.some((b) => !b.holidaySkip && b.status === BookingStatus.CANCELLED),
+        cancelled: dayBookings.some(
+          (b) => !b.holidaySkip && b.status === BookingStatus.CANCELLED && !isDebtSettled(b),
+        ),
+        // Recupera una clase debida: no se cobra ni cuenta, se pinta aparte.
+        debtSettled: dayBookings.some((b) => !b.holidaySkip && isDebtSettled(b)),
       };
     });
 
     function sessionsInRange(fromDay: number, toDay: number): number {
       return realBookings.filter((b) => {
         const d = b.startTime.getUTCDate();
-        return !b.holidaySkip && d >= fromDay && d <= toDay;
+        return !b.holidaySkip && !isDebtSettled(b) && d >= fromDay && d <= toDay;
       }).length;
     }
 
