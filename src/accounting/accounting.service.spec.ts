@@ -145,15 +145,80 @@ describe('AccountingService.buildClientMonth (finalMonthBilling)', () => {
     expect(result.segments[0].amount).toBe(120);
   });
 
-  it('cobra aparte las sesiones de más cuando el cliente viene más de lo que cubre su cupo', () => {
+  it('por defecto, las sesiones de más NO se cobran: solo se deja constancia de cuántas hay', () => {
     const service = makeService();
     const purchase = makePurchase({
       activatedAt: new Date(Date.UTC(2024, 4, 1)), // cubre el mes entero
       price: 120,
       sessionCount: 12,
     });
-    // 14 sesiones en vez de las 12 del cupo: 2 de más.
+    // 14 sesiones en vez de las 12 del cupo: 2 de más, ninguna en payment.
     const bookings = Array.from({ length: 14 }, (_, i) => makeBooking(i + 1));
+
+    const result: any = (service as any).buildClientMonth(
+      makeClient(),
+      monthStart,
+      monthEndExclusive,
+      daysInMonth,
+      [purchase],
+      bookings,
+      null, // sin MonthlyPayment guardado: chargedExtraSessions se asume 0
+    );
+
+    expect(result.segments[0].basis).toBe('full_month');
+    expect(result.segments[0].amount).toBe(120);
+    expect(result.segments[0].extraSessions).toBe(2);
+    expect(result.segments[0].chargedExtraSessions).toBe(0);
+    expect(result.segments[0].pricePerSession).toBe(120 / 12);
+  });
+
+  it('cobra como sueltas las que el admin elija (chargedExtraSessions), nunca más de las que de verdad sobraron', () => {
+    const service = makeService();
+    const purchase = makePurchase({
+      activatedAt: new Date(Date.UTC(2024, 4, 1)),
+      price: 120,
+      sessionCount: 12,
+    });
+    const bookings = Array.from({ length: 14 }, (_, i) => makeBooking(i + 1)); // 2 de más
+
+    const result: any = (service as any).buildClientMonth(
+      makeClient(),
+      monthStart,
+      monthEndExclusive,
+      daysInMonth,
+      [purchase],
+      bookings,
+      { chargedExtraSessions: 1 } as any, // el admin solo quiere cobrar 1 de las 2
+    );
+
+    const pricePerSession = 120 / 12;
+    expect(result.segments[0].basis).toBe('full_month_plus_extra');
+    expect(result.segments[0].chargedExtraSessions).toBe(1);
+    expect(result.segments[0].extraAmount).toBe(pricePerSession);
+    expect(result.segments[0].amount).toBe(120 + pricePerSession);
+
+    const resultClamped: any = (service as any).buildClientMonth(
+      makeClient(),
+      monthStart,
+      monthEndExclusive,
+      daysInMonth,
+      [purchase],
+      bookings,
+      { chargedExtraSessions: 99 } as any, // pide más de las que de verdad hay
+    );
+    expect(resultClamped.segments[0].chargedExtraSessions).toBe(2);
+    expect(resultClamped.segments[0].amount).toBe(120 + 2 * pricePerSession);
+  });
+
+  it('cobra el mes normal (sin descuento) cuando el cliente viene menos de lo que cubre su cupo, y deja constancia de cuántas faltaron', () => {
+    const service = makeService();
+    const purchase = makePurchase({
+      activatedAt: new Date(Date.UTC(2024, 4, 1)), // cubre el mes entero
+      price: 120,
+      sessionCount: 12,
+    });
+    // 11 sesiones en vez de las 12 del cupo: 1 de menos.
+    const bookings = Array.from({ length: 11 }, (_, i) => makeBooking(i + 1));
 
     const result: any = (service as any).buildClientMonth(
       makeClient(),
@@ -165,13 +230,37 @@ describe('AccountingService.buildClientMonth (finalMonthBilling)', () => {
       null,
     );
 
-    const pricePerSession = 120 / 12;
-    expect(result.segments[0].basis).toBe('full_month_plus_extra');
-    expect(result.segments[0].extraSessions).toBe(2);
-    expect(result.segments[0].amount).toBe(120 + 2 * pricePerSession);
+    expect(result.segments[0].basis).toBe('full_month');
+    expect(result.segments[0].amount).toBe(120);
+    expect(result.segments[0].missingSessions).toBe(1);
+    expect(result.segments[0].extraSessions).toBeNull();
   });
 
-  it('una sesión cancelada se cobra igual que una dada, pero no cuenta como "sesión dada" y se marca aparte en days', () => {
+  it('exactamente el cupo no deja ni "de más" ni "de menos"', () => {
+    const service = makeService();
+    const purchase = makePurchase({
+      activatedAt: new Date(Date.UTC(2024, 4, 1)),
+      price: 120,
+      sessionCount: 12,
+    });
+    const bookings = Array.from({ length: 12 }, (_, i) => makeBooking(i + 1));
+
+    const result: any = (service as any).buildClientMonth(
+      makeClient(),
+      monthStart,
+      monthEndExclusive,
+      daysInMonth,
+      [purchase],
+      bookings,
+      null,
+    );
+
+    expect(result.segments[0].basis).toBe('full_month');
+    expect(result.segments[0].missingSessions).toBeNull();
+    expect(result.segments[0].extraSessions).toBeNull();
+  });
+
+  it('una sesión cancelada se cobra igual que una dada, pero se cuenta aparte (cancelledCount, no sessionCount)', () => {
     const service = makeService();
     const purchase = makePurchase({
       activatedAt: new Date(Date.UTC(2024, 4, 1)),
@@ -200,8 +289,9 @@ describe('AccountingService.buildClientMonth (finalMonthBilling)', () => {
     expect(result.segments[0].sessions).toBe(2);
     expect(result.segments[0].amount).toBe(2 * pricePerSession);
 
-    // Pero "sesiones dadas" (days/hasClass) solo cuenta la real.
+    // "Sesiones dadas" solo cuenta la real; la cancelada se cuenta aparte.
     expect(result.sessionCount).toBe(1);
+    expect(result.cancelledCount).toBe(1);
     const diaDado = result.days.find((d: any) => d.day === 3);
     const diaCancelado = result.days.find((d: any) => d.day === 5);
     expect(diaDado).toMatchObject({ hasClass: true, cancelled: false });

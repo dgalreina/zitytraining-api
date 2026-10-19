@@ -8,4 +8,11 @@ export class SetPaymentDto {
   @IsNumber()
   @Min(0)
   amountReceived?: number;
+
+  // Cuántas de las sesiones de más (por encima del cupo del plan) quiere
+  // cobrar el admin como sueltas; el resto de sesiones de más no se cobra.
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  chargedExtraSessions?: number;
 }

@@ -23,6 +23,12 @@ export class MonthlyPayment extends Document {
   // guarda aparte en vez de asumir que "recibido" implica el importe exacto.
   @Prop({ required: false })
   amountReceived?: number;
+
+  // Cuando el cliente ha dado más sesiones de las que cubre el cupo de su
+  // plan, por defecto no se cobran: el admin elige cuántas de esas
+  // sueltas quiere cobrar aparte (0 por defecto). Ver accounting.service.
+  @Prop({ required: false })
+  chargedExtraSessions?: number;
 }
 
 export const MonthlyPaymentSchema = SchemaFactory.createForClass(MonthlyPayment);

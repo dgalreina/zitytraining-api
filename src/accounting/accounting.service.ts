@@ -92,6 +92,37 @@ export class AccountingService {
     return { year, month, daysInMonth, clients: visibleClients };
   }
 
+  // El mes de un solo cliente, recalculado de cero: lo usa setPayment para
+  // devolver el tramo ya actualizado tras guardar (recibido, importe, o
+  // cuántas sueltas se cobran) sin que el front tenga que volver a pedir
+  // la tabla entera.
+  async getClientMonth(clientId: string, year: number, month: number) {
+    const monthStart = new Date(Date.UTC(year, month - 1, 1));
+    const monthEndExclusive = new Date(Date.UTC(year, month, 1));
+    const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+
+    const client = await this.userModel.findById(clientId).select('firstName lastName status').exec();
+    if (!client) {
+      throw new BadRequestException('Cliente no encontrado');
+    }
+
+    const [purchasesByClient, bookingsByClient, payment] = await Promise.all([
+      this.purchasesByClient([clientId]),
+      this.bookingsByClient([clientId], monthStart, monthEndExclusive),
+      this.paymentModel.findOne({ client: clientId, year, month }).exec(),
+    ]);
+
+    return this.buildClientMonth(
+      client,
+      monthStart,
+      monthEndExclusive,
+      daysInMonth,
+      purchasesByClient.get(clientId) || [],
+      bookingsByClient.get(clientId) || [],
+      payment,
+    );
+  }
+
   // Los pausados también entran: un plan en pausa sigue siendo del
   // cliente, solo que un puntual lo tapa durante un tiempo. Cuándo se
   // pausó y cuándo se retoma se saca del propio puntual (ver
@@ -196,6 +227,8 @@ export class AccountingService {
       let sessions: number | null = null;
       let extraSessions: number | null = null;
       let extraAmount: number | null = null;
+      let chargedExtraSessions: number | null = null;
+      let missingSessions: number | null = null;
 
       if (span.isFreeSessions) {
         sessions = sessionsInRange(span.fromDay, span.toDay);
@@ -207,18 +240,28 @@ export class AccountingService {
 
         // Un plan cerrado tiene un cupo fijo de sesiones al mes
         // (sesiones/semana × 4, guardado en sessionCount al asignarlo).
-        // Si el cliente viene a más, esas de más se cobran aparte, al
-        // mismo precio por sesión que tendría un bono de sesiones
-        // libres equivalente (misma cuenta: precio del plan ÷ su cupo).
+        // Dar menos o más del cupo no cambia lo que se cobra: el mes se
+        // cobra entero igual, se decida lo que se decida. Lo único que
+        // pasa es que se deja constancia (para que se vea en el
+        // desglose): cuántas faltaron, o cuántas sobraron. Las que
+        // sobran se pueden cobrar aparte como sueltas, pero SOLO si el
+        // admin elige cuántas (chargedExtraSessions, guardado en
+        // MonthlyPayment) — por defecto, ninguna.
         if (span.purchase.sessionCount) {
           const given = sessionsInRange(span.fromDay, span.toDay);
           const extra = given - span.purchase.sessionCount;
+          sessions = given;
           if (extra > 0) {
-            sessions = given;
             extraSessions = extra;
-            extraAmount = extra * pricePerSession;
-            amount += extraAmount;
-            basis = 'full_month_plus_extra';
+            const charged = Math.max(0, Math.min(payment?.chargedExtraSessions ?? 0, extra));
+            chargedExtraSessions = charged;
+            if (charged > 0) {
+              extraAmount = charged * pricePerSession;
+              amount += extraAmount;
+              basis = 'full_month_plus_extra';
+            }
+          } else if (extra < 0) {
+            missingSessions = -extra;
           }
         }
       } else {
@@ -252,12 +295,17 @@ export class AccountingService {
         amount: Math.round(amount * 100) / 100,
         basis,
         sessions,
+        // Hace falta también con extraSessions sin cobrar todavía (basis
+        // sigue en 'full_month'): el front lo necesita para enseñar
+        // cuánto costaría cada suelta antes de que el admin elija cuántas.
         pricePerSession:
-          basis === 'sessions' || basis === 'full_month_plus_extra'
+          basis === 'sessions' || basis === 'full_month_plus_extra' || extraSessions !== null
             ? Math.round(pricePerSession * 100) / 100
             : null,
         extraSessions,
         extraAmount: extraAmount !== null ? Math.round(extraAmount * 100) / 100 : null,
+        chargedExtraSessions,
+        missingSessions,
       };
     });
 
@@ -269,6 +317,9 @@ export class AccountingService {
       segments,
       days,
       sessionCount: days.filter((d) => d.hasClass).length,
+      // Se cobra igual que una dada (ver bookingsByClient), pero se
+      // cuenta aparte: "sesiones dadas" son las que de verdad hubo.
+      cancelledCount: days.filter((d) => d.cancelled).length,
       due: Math.round(due * 100) / 100,
       payment: payment
         ? { received: payment.received, amountReceived: payment.amountReceived ?? null }
@@ -377,17 +428,23 @@ export class AccountingService {
     return spans;
   }
 
-  async setPayment(
-    clientId: string,
-    year: number,
-    month: number,
-    data: SetPaymentDto,
-  ): Promise<MonthlyPayment> {
-    const updated = await this.paymentModel.findOneAndUpdate(
+  // Devuelve el mes de ese cliente ya recalculado (no solo el pago
+  // guardado): chargedExtraSessions cambia lo que se cobra, así que el
+  // front necesita el tramo entero actualizado, no solo el pago.
+  async setPayment(clientId: string, year: number, month: number, data: SetPaymentDto) {
+    await this.paymentModel.findOneAndUpdate(
       { client: clientId, year, month },
-      { $set: { received: data.received, amountReceived: data.amountReceived } },
+      {
+        $set: {
+          received: data.received,
+          amountReceived: data.amountReceived,
+          ...(data.chargedExtraSessions !== undefined
+            ? { chargedExtraSessions: data.chargedExtraSessions }
+            : {}),
+        },
+      },
       { new: true, upsert: true },
     );
-    return updated;
+    return this.getClientMonth(clientId, year, month);
   }
 }
