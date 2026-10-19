@@ -46,7 +46,7 @@ function makeHolidayModelMock(holidayDates: string[] = []) {
 }
 
 function makeOwedSessionsMock() {
-  return { removeOldestForClient: jest.fn().mockResolvedValue(undefined) };
+  return { markOldestAsRecovered: jest.fn().mockResolvedValue(undefined) };
 }
 
 // Compartido por los tests que no les interesa "debida" en absoluto (la
@@ -608,7 +608,7 @@ describe('BookingsService — marcar una sesión como "debida" (recupera una cla
       isDebtSettlement: true,
     } as any);
 
-    expect(owedMock.removeOldestForClient).toHaveBeenCalledWith('c1');
+    expect(owedMock.markOldestAsRecovered).toHaveBeenCalledWith('c1', expect.any(String));
   });
 
   it('en un dúo, recupera una clase debida de CADA cliente, no solo de uno: la cancelación/recuperación es para todo el grupo', async () => {
@@ -630,9 +630,9 @@ describe('BookingsService — marcar una sesión como "debida" (recupera una cla
       isDebtSettlement: true,
     } as any);
 
-    expect(owedMock.removeOldestForClient).toHaveBeenCalledWith('c1');
-    expect(owedMock.removeOldestForClient).toHaveBeenCalledWith('c2');
-    expect(owedMock.removeOldestForClient).toHaveBeenCalledTimes(2);
+    expect(owedMock.markOldestAsRecovered).toHaveBeenCalledWith('c1', expect.any(String));
+    expect(owedMock.markOldestAsRecovered).toHaveBeenCalledWith('c2', expect.any(String));
+    expect(owedMock.markOldestAsRecovered).toHaveBeenCalledTimes(2);
   });
 
   it('al crear una sesión normal (sin isDebtSettlement), no toca la lista de clases debidas', async () => {
@@ -653,7 +653,7 @@ describe('BookingsService — marcar una sesión como "debida" (recupera una cla
       endTime: '2024-06-03T09:00:00.000Z',
     } as any);
 
-    expect(owedMock.removeOldestForClient).not.toHaveBeenCalled();
+    expect(owedMock.markOldestAsRecovered).not.toHaveBeenCalled();
   });
 
   it('al editar y poner isDebtSettlement por primera vez, recupera una clase debida', async () => {
@@ -675,7 +675,7 @@ describe('BookingsService — marcar una sesión como "debida" (recupera una cla
 
     await service.update('b1', { isDebtSettlement: true } as any, 't1');
 
-    expect(owedMock.removeOldestForClient).toHaveBeenCalledWith('c1');
+    expect(owedMock.markOldestAsRecovered).toHaveBeenCalledWith('c1', expect.any(String));
   });
 
   it('al volver a guardar una sesión ya marcada como debida, no vuelve a descontar otra', async () => {
@@ -697,6 +697,6 @@ describe('BookingsService — marcar una sesión como "debida" (recupera una cla
 
     await service.update('b1', { isDebtSettlement: true, notes: 'cambio algo más' } as any, 't1');
 
-    expect(owedMock.removeOldestForClient).not.toHaveBeenCalled();
+    expect(owedMock.markOldestAsRecovered).not.toHaveBeenCalled();
   });
 });

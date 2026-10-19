@@ -17,6 +17,13 @@ export class OwedSessionsController {
     return this.owedSessionsService.findByClient(client);
   }
 
+  // ?clients=id1,id2,id3 -> { id1: 2, id2: 0, ... } (solo pendientes).
+  @Get('pending-count')
+  pendingCount(@Query('clients') clients: string) {
+    const ids = (clients || '').split(',').filter(Boolean);
+    return this.owedSessionsService.countPendingByClients(ids);
+  }
+
   @Post()
   create(@Body() body: CreateOwedSessionDto) {
     return this.owedSessionsService.create(body);

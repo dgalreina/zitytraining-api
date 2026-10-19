@@ -50,3 +50,11 @@ export function atMadridHour(date: Date, hour: number): Date {
     .set({ hour, minute: 0, second: 0, millisecond: 0 })
     .toJSDate();
 }
+
+// Día y hora en Madrid, en castellano, para dejar constancia de qué
+// sesión recuperó una clase debida (p.ej. "26 de octubre a las 10:00").
+export function formatMadridDateTime(date: Date): string {
+  return DateTime.fromJSDate(date, { zone: GYM_TIMEZONE })
+    .setLocale('es')
+    .toFormat("d 'de' LLLL 'a las' HH:mm");
+}

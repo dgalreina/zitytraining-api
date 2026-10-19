@@ -11,7 +11,7 @@ import { BookingSeries } from './booking-series.schema';
 import { Holiday } from '../holidays/holidays.schema';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { UpdateBookingDto } from './dto/update-booking.dto';
-import { addWeeksKeepingLocalTime, shiftKeepingWeekPattern } from './timezone';
+import { addWeeksKeepingLocalTime, formatMadridDateTime, shiftKeepingWeekPattern } from './timezone';
 import { OwedSessionsService } from '../owed-sessions/owed-sessions.service';
 
 // Un solo nivel de populate no basta: dentro del workout hace falta el
@@ -65,8 +65,12 @@ export class BookingsService {
     const saved = await created.save();
     if (rest.isDebtSettlement) {
       // Es para todo el grupo: se da por recuperada la más antigua de
-      // CADA cliente de la sesión, no solo de uno.
-      await Promise.all(clients.map((c) => this.owedSessionsService.removeOldestForClient(c)));
+      // CADA cliente de la sesión, no solo de uno. No se borra sola: se
+      // deja constancia de qué sesión la recuperó (ver owed-sessions.service).
+      const label = formatMadridDateTime(startTime);
+      await Promise.all(
+        clients.map((c) => this.owedSessionsService.markOldestAsRecovered(c, label)),
+      );
     }
     return saved;
   }
@@ -326,14 +330,16 @@ export class BookingsService {
 
     // Solo se da por recuperada una clase debida la primera vez que se
     // marca esta sesión como "debida": si ya lo estaba (se está editando
-    // otra cosa de la misma sesión), no se descuenta otra vez. Es para
-    // todo el grupo: se recupera la más antigua de CADA cliente.
+    // otra cosa de la misma sesión), no se vuelve a marcar otra. Es para
+    // todo el grupo: se recupera la más antigua de CADA cliente, dejando
+    // constancia de qué sesión la recuperó (no se borra sola).
     if (data.isDebtSettlement && !existing.isDebtSettlement) {
       const settlingClients = ((updatePayload.clients as string[] | undefined) ?? existing.clients).map(
         (c: any) => c.toString(),
       );
+      const label = formatMadridDateTime(startTime);
       await Promise.all(
-        settlingClients.map((c) => this.owedSessionsService.removeOldestForClient(c)),
+        settlingClients.map((c) => this.owedSessionsService.markOldestAsRecovered(c, label)),
       );
     }
 
