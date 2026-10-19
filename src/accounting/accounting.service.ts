@@ -6,7 +6,7 @@ import { SetPaymentDto } from './dto/set-payment.dto';
 import { User, Role, UserStatus } from '../users/users.schema';
 import { Purchase, PurchaseStatus, PurchaseType, FinalMonthBilling } from '../purchases/purchases.schema';
 import { BookingsService } from '../bookings/bookings.service';
-import { Booking } from '../bookings/bookings.schema';
+import { Booking, BookingStatus } from '../bookings/bookings.schema';
 
 // De dónde sale el importe de un tramo: el precio del plan entero, el
 // precio del plan entero más las sesiones de más que no entraban en su
@@ -131,7 +131,10 @@ export class AccountingService {
     const wanted = new Set(clientIds);
     const byClient = new Map<string, Booking[]>();
     for (const booking of bookings) {
-      if (booking.status === 'cancelled') continue;
+      // Una cancelada se sigue cobrando (el cliente ya ocupaba la plaza),
+      // así que entra igual que una normal: solo cambia cómo se pinta el
+      // día (ver "cancelled" en buildClientMonth). Una borrada de verdad
+      // ya no llega hasta aquí: no existe en BBDD.
       // Una reserva de dúo/trío cuenta para cada uno de sus clientes.
       for (const client of booking.clients) {
         const key = client.toString();
@@ -162,8 +165,12 @@ export class AccountingService {
       const dayBookings = realBookings.filter((b) => b.startTime.getUTCDate() === day);
       return {
         day,
-        hasClass: dayBookings.some((b) => !b.holidaySkip),
+        hasClass: dayBookings.some((b) => !b.holidaySkip && b.status !== BookingStatus.CANCELLED),
         holiday: dayBookings.some((b) => b.holidaySkip),
+        // Se cobra igual que una dada (ver sessionsInRange, que no
+        // distingue por status), pero se pinta aparte para que se note
+        // que no hubo clase de verdad.
+        cancelled: dayBookings.some((b) => !b.holidaySkip && b.status === BookingStatus.CANCELLED),
       };
     });
 

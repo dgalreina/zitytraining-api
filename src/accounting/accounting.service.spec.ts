@@ -1,7 +1,7 @@
 import { AccountingService } from './accounting.service';
 import { FinalMonthBilling, Purchase, PurchaseType } from '../purchases/purchases.schema';
 import { User, UserStatus } from '../users/users.schema';
-import { Booking } from '../bookings/bookings.schema';
+import { Booking, BookingStatus } from '../bookings/bookings.schema';
 
 // buildClientMonth/overlappingSpans no tocan la base de datos (son
 // cálculo puro sobre lo que se les pasa), así que no hace falta montar
@@ -170,6 +170,43 @@ describe('AccountingService.buildClientMonth (finalMonthBilling)', () => {
     expect(result.segments[0].extraSessions).toBe(2);
     expect(result.segments[0].amount).toBe(120 + 2 * pricePerSession);
   });
+
+  it('una sesión cancelada se cobra igual que una dada, pero no cuenta como "sesión dada" y se marca aparte en days', () => {
+    const service = makeService();
+    const purchase = makePurchase({
+      activatedAt: new Date(Date.UTC(2024, 4, 1)),
+      endedAt: new Date(Date.UTC(2024, 5, 10)), // tramo cojo: 1-9
+      price: 120,
+      sessionCount: 12,
+      finalMonthBilling: FinalMonthBilling.SESSIONS,
+    });
+    const bookings = [
+      makeBooking(3), // dada normal
+      makeBooking(5, { status: BookingStatus.CANCELLED }), // cancelada, se cobra igual
+    ];
+
+    const result: any = (service as any).buildClientMonth(
+      makeClient(),
+      monthStart,
+      monthEndExclusive,
+      daysInMonth,
+      [purchase],
+      bookings,
+      null,
+    );
+
+    const pricePerSession = 120 / 12;
+    // Se cobran las 2 (sessionsInRange no distingue por status).
+    expect(result.segments[0].sessions).toBe(2);
+    expect(result.segments[0].amount).toBe(2 * pricePerSession);
+
+    // Pero "sesiones dadas" (days/hasClass) solo cuenta la real.
+    expect(result.sessionCount).toBe(1);
+    const diaDado = result.days.find((d: any) => d.day === 3);
+    const diaCancelado = result.days.find((d: any) => d.day === 5);
+    expect(diaDado).toMatchObject({ hasClass: true, cancelled: false });
+    expect(diaCancelado).toMatchObject({ hasClass: false, cancelled: true });
+  });
 });
 
 describe('AccountingService.coverageIntervals (privado) — pausas por un puntual', () => {
@@ -260,5 +297,25 @@ describe('AccountingService.coverageIntervals (privado) — pausas por un puntua
     const planSegment = result.segments.find((s: any) => s.label === 'Plan mensual');
     expect(planSegment.basis).toBe('full_month');
     expect(planSegment.amount).toBe(120);
+  });
+});
+
+describe('AccountingService.bookingsByClient (privado)', () => {
+  it('incluye las sesiones canceladas (se cobran); una borrada de verdad ni llega aquí, no hace falta filtrarla', async () => {
+    const bookingsService = {
+      findByClientsAndRange: jest.fn().mockResolvedValue([
+        makeBooking(3, { clients: ['client-1'] as any }),
+        makeBooking(5, { clients: ['client-1'] as any, status: BookingStatus.CANCELLED }),
+      ]),
+    };
+    const service = new AccountingService({} as any, {} as any, {} as any, bookingsService as any);
+
+    const byClient = await (service as any).bookingsByClient(
+      ['client-1'],
+      new Date(Date.UTC(2024, 5, 1)),
+      new Date(Date.UTC(2024, 6, 1)),
+    );
+
+    expect(byClient.get('client-1')).toHaveLength(2);
   });
 });
