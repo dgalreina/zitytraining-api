@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { OwedSession } from './owed-session.schema';
@@ -17,11 +17,18 @@ export class OwedSessionsService {
     return created.save();
   }
 
+  // Una ya recuperada (con recoveredNote) no se puede borrar: es el único
+  // rastro de qué sesión la recuperó, y perderlo deja la sesión excluida
+  // de Contabilidad para siempre sin forma de saber por qué.
   async remove(id: string): Promise<void> {
-    const existing = await this.owedSessionModel.findByIdAndDelete(id);
+    const existing = await this.owedSessionModel.findById(id);
     if (!existing) {
       throw new NotFoundException('Clase debida no encontrada');
     }
+    if (existing.recoveredNote) {
+      throw new BadRequestException('Esta clase ya está recuperada, no se puede borrar');
+    }
+    await this.owedSessionModel.findByIdAndDelete(id);
   }
 
   // Al dar una sesión marcada como "debida" se da por recuperada la más
