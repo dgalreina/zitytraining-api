@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
+import { WeightOverrideSlot, WeightOverrideSlotSchema } from './weight-override.schema';
 
 // Plantilla de una sesión que se repite cada semana, para siempre (sin
 // fecha de fin salvo que se "pare" a mano). Las sesiones de verdad son
@@ -22,6 +23,12 @@ export class BookingSeries extends Document {
 
   @Prop({ type: Types.ObjectId, ref: 'Workout', required: false })
   workout?: Types.ObjectId;
+
+  // Pesos/reps reales de esta serie: lo que llevan las sesiones futuras
+  // que aun no existen como Booking (ver generateSeriesOccurrences). Se
+  // actualiza junto con el Booking editado cuando se guardan pesos.
+  @Prop({ type: [WeightOverrideSlotSchema], default: [] })
+  weightOverrides?: WeightOverrideSlot[];
 
   @Prop({ type: Boolean, default: false })
   isPrivate!: boolean;

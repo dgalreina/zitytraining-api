@@ -1,3 +1,4 @@
+import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
@@ -7,7 +8,9 @@ import {
   IsMongoId,
   IsOptional,
   IsString,
+  ValidateNested,
 } from 'class-validator';
+import { WeightOverrideSlotDto } from './weight-override.dto';
 
 export class CreateBookingDto {
   @IsMongoId()
@@ -58,4 +61,15 @@ export class CreateBookingDto {
   @IsOptional()
   @IsBoolean()
   isDebtSettlement?: boolean;
+
+  // Pesos/reps reales de esta sesión (ver weight-override.schema.ts), por
+  // si se editaron desde el lápiz del entrenamiento antes del primer
+  // guardado. Si la sesión nace como serie semanal, se guardan también en
+  // la plantilla de la serie para que las que se generen más adelante los
+  // lleven.
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => WeightOverrideSlotDto)
+  weightOverrides?: WeightOverrideSlotDto[];
 }

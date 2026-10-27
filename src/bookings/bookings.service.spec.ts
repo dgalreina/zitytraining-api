@@ -138,6 +138,31 @@ describe('BookingsService — generación de series recurrentes', () => {
     expect(docs[2].startTime.toISOString()).toBe('2024-06-17T08:00:00.000Z');
   });
 
+  it('copia los weightOverrides de la serie a cada ocurrencia generada', async () => {
+    const bookingModel = makeBookingModelMock();
+    const holidayModel = makeHolidayModelMock();
+    const weightOverrides = [{ exercise: 'ex-1', sets: [{ reps: 8, weight: 40 }] }];
+    const existingSeries: any = {
+      _id: 'series-1',
+      trainer: 't1',
+      clients: ['c1'],
+      durationMinutes: 45,
+      isPrivate: false,
+      isInterview: false,
+      workout: 'workout-1',
+      weightOverrides,
+      generatedUntil: new Date('2024-06-03T08:00:00.000Z'),
+      save: jest.fn().mockResolvedValue(undefined),
+    };
+    const service = new BookingsService(bookingModel, {} as any, holidayModel as any, owedSessionsMock as any);
+
+    await (service as any).generateSeriesOccurrences(existingSeries, new Date('2024-06-17T08:00:00.000Z'));
+
+    const docs = bookingModel.insertMany.mock.calls[0][0] as any[];
+    expect(docs.length).toBeGreaterThan(0);
+    expect(docs.every((d) => d.weightOverrides === weightOverrides)).toBe(true);
+  });
+
   it('marca holidaySkip en las ocurrencias que caen en festivo', async () => {
     const bookingModel = makeBookingModelMock();
     const seriesModel = makeSeriesModelMock();
@@ -158,6 +183,49 @@ describe('BookingsService — generación de series recurrentes', () => {
 
     const docs = bookingModel.insertMany.mock.calls[0][0] as any[];
     expect(docs.map((d) => d.holidaySkip)).toEqual([false, true, false]);
+  });
+});
+
+describe('BookingsService.create — weightOverrides al crear (desde el lápiz, antes del primer guardado)', () => {
+  it('en una sesión suelta, los guarda tal cual en la propia sesión', async () => {
+    const bookingModel = makeBookingModelMock();
+    const seriesModel = makeSeriesModelMock();
+    const holidayModel = makeHolidayModelMock();
+    bookingModel.mockImplementation(function (this: any, data: any) {
+      Object.assign(this, data);
+      this.save = jest.fn().mockResolvedValue(this);
+    });
+    const service = new BookingsService(bookingModel, seriesModel, holidayModel as any, owedSessionsMock as any);
+
+    const created = await service.create({
+      trainer: 't1',
+      clients: ['c1'],
+      startTime: '2024-06-03T08:00:00.000Z',
+      endTime: '2024-06-03T09:00:00.000Z',
+      weightOverrides: [{ exerciseId: 'ex-1', sets: [{ reps: 8, weight: 60 }] }],
+    } as any);
+
+    expect((created as any).weightOverrides).toEqual([{ exercise: 'ex-1', sets: [{ reps: 8, weight: 60 }] }]);
+  });
+
+  it('en una serie semanal, los guarda en la plantilla y se copian a las sesiones generadas', async () => {
+    const bookingModel = makeBookingModelMock();
+    const seriesModel = makeSeriesModelMock();
+    const holidayModel = makeHolidayModelMock();
+    const service = new BookingsService(bookingModel, seriesModel, holidayModel as any, owedSessionsMock as any);
+
+    await service.create({
+      ...baseBooking,
+      startTime: '2024-06-03T08:00:00.000Z',
+      endTime: '2024-06-03T08:45:00.000Z',
+      weightOverrides: [{ exerciseId: 'ex-1', sets: [{ reps: 8, weight: 60 }] }],
+    } as any);
+
+    const seriesData = seriesModel.mock.calls[0][0];
+    expect(seriesData.weightOverrides).toEqual([{ exercise: 'ex-1', sets: [{ reps: 8, weight: 60 }] }]);
+
+    const docs = bookingModel.insertMany.mock.calls[0][0] as any[];
+    expect(docs[0].weightOverrides).toEqual([{ exercise: 'ex-1', sets: [{ reps: 8, weight: 60 }] }]);
   });
 });
 
@@ -402,9 +470,12 @@ describe('BookingsService.update — aplicar el entrenamiento a "esta y todas la
 
     expect(bookingModel.updateMany).toHaveBeenCalledWith(
       { series: 'series-x', startTime: { $gte: existing.startTime }, _id: { $ne: 'b1' } },
-      { workout: 'workout-nuevo' },
+      { workout: 'workout-nuevo', weightOverrides: [] },
     );
-    expect(seriesModel.findByIdAndUpdate).toHaveBeenCalledWith('series-x', { workout: 'workout-nuevo' });
+    expect(seriesModel.findByIdAndUpdate).toHaveBeenCalledWith('series-x', {
+      workout: 'workout-nuevo',
+      weightOverrides: [],
+    });
   });
 
   it('también propaga el borrado del entrenamiento (workoutId null) a la serie', async () => {
@@ -427,9 +498,12 @@ describe('BookingsService.update — aplicar el entrenamiento a "esta y todas la
 
     expect(bookingModel.updateMany).toHaveBeenCalledWith(
       expect.anything(),
-      { workout: null },
+      { workout: null, weightOverrides: [] },
     );
-    expect(seriesModel.findByIdAndUpdate).toHaveBeenCalledWith('series-x', { workout: null });
+    expect(seriesModel.findByIdAndUpdate).toHaveBeenCalledWith('series-x', {
+      workout: null,
+      weightOverrides: [],
+    });
   });
 
   it('sin applyWorkoutToSeries, el cambio de entrenamiento se queda solo en esta sesión', async () => {
@@ -698,5 +772,128 @@ describe('BookingsService — marcar una sesión como "debida" (recupera una cla
     await service.update('b1', { isDebtSettlement: true, notes: 'cambio algo más' } as any, 't1');
 
     expect(owedMock.markOldestAsRecovered).not.toHaveBeenCalled();
+  });
+});
+
+describe('BookingsService.update — propagar pesos a "esta y todas las futuras" (nunca a las pasadas)', () => {
+  function buildExisting() {
+    return {
+      _id: 'b1',
+      isPrivate: false,
+      trainer: { toString: () => 't1' },
+      clients: ['c1'],
+      workout: 'workout-1',
+      series: 'series-x',
+      startTime: new Date('2024-06-03T08:00:00.000Z'),
+      endTime: new Date('2024-06-03T09:00:00.000Z'),
+    };
+  }
+
+  it('al mandar weightOverrides en una sesión de una serie, se propaga solo a esta y a las futuras (sin flag) y a la plantilla', async () => {
+    const bookingModel = makeBookingModelMock();
+    const seriesModel = makeSeriesModelMock();
+    const holidayModel = makeHolidayModelMock();
+    const existing: any = buildExisting();
+    bookingModel.findById.mockResolvedValue(existing);
+    const service = new BookingsService(bookingModel, seriesModel, holidayModel as any, owedSessionsMock as any);
+
+    const sets = [{ reps: 8, weight: 42.5 }];
+    await service.update(
+      'b1',
+      { weightOverrides: [{ exerciseId: 'ex-1', sets }] } as any,
+      't1',
+    );
+
+    const expectedOverrides = [{ exercise: 'ex-1', sets }];
+    expect(bookingModel.updateMany).toHaveBeenCalledWith(
+      { series: 'series-x', startTime: { $gte: existing.startTime }, _id: { $ne: 'b1' } },
+      { weightOverrides: expectedOverrides },
+    );
+    expect(seriesModel.findByIdAndUpdate).toHaveBeenCalledWith('series-x', {
+      weightOverrides: expectedOverrides,
+    });
+  });
+
+  it('sin serie, weightOverrides solo se guarda en esa sesión', async () => {
+    const bookingModel = makeBookingModelMock();
+    const seriesModel = makeSeriesModelMock();
+    const holidayModel = makeHolidayModelMock();
+    const existing: any = { ...buildExisting(), series: null };
+    bookingModel.findById.mockResolvedValue(existing);
+    const service = new BookingsService(bookingModel, seriesModel, holidayModel as any, owedSessionsMock as any);
+
+    await service.update(
+      'b1',
+      { weightOverrides: [{ exerciseId: 'ex-1', sets: [{ reps: 8, weight: 40 }] }] } as any,
+      't1',
+    );
+
+    expect(bookingModel.updateMany).not.toHaveBeenCalled();
+    expect(seriesModel.findByIdAndUpdate).not.toHaveBeenCalled();
+  });
+
+  it('al cambiar de entrenamiento para toda la serie sin mandar pesos nuevos, limpia los overrides viejos', async () => {
+    const bookingModel = makeBookingModelMock();
+    const seriesModel = makeSeriesModelMock();
+    const holidayModel = makeHolidayModelMock();
+    const existing: any = buildExisting();
+    bookingModel.findById.mockResolvedValue(existing);
+    const service = new BookingsService(bookingModel, seriesModel, holidayModel as any, owedSessionsMock as any);
+
+    await service.update(
+      'b1',
+      { workoutId: 'workout-nuevo', applyWorkoutToSeries: true } as any,
+      't1',
+    );
+
+    expect(bookingModel.updateMany).toHaveBeenCalledWith(
+      { series: 'series-x', startTime: { $gte: existing.startTime }, _id: { $ne: 'b1' } },
+      { workout: 'workout-nuevo', weightOverrides: [] },
+    );
+    expect(seriesModel.findByIdAndUpdate).toHaveBeenCalledWith('series-x', {
+      workout: 'workout-nuevo',
+      weightOverrides: [],
+    });
+  });
+
+  it('al cambiar de entrenamiento mandando pesos nuevos en la misma llamada, propaga esos pesos en vez de vaciarlos', async () => {
+    const bookingModel = makeBookingModelMock();
+    const seriesModel = makeSeriesModelMock();
+    const holidayModel = makeHolidayModelMock();
+    const existing: any = buildExisting();
+    bookingModel.findById.mockResolvedValue(existing);
+    const service = new BookingsService(bookingModel, seriesModel, holidayModel as any, owedSessionsMock as any);
+
+    await service.update(
+      'b1',
+      {
+        workoutId: 'workout-nuevo',
+        applyWorkoutToSeries: true,
+        weightOverrides: [{ exerciseId: 'ex-nuevo', sets: [{ reps: 10, weight: 20 }] }],
+      } as any,
+      't1',
+    );
+
+    // Dos llamadas separadas (una por cada bloque), pero ninguna vacía los
+    // pesos nuevos: el bloque del entrenamiento solo limpia weightOverrides
+    // cuando la propia petición no trae pesos nuevos (ver test anterior).
+    const expectedOverrides = [{ exercise: 'ex-nuevo', sets: [{ reps: 10, weight: 20 }] }];
+    const filter = { series: 'series-x', startTime: { $gte: existing.startTime }, _id: { $ne: 'b1' } };
+    expect(bookingModel.updateMany).toHaveBeenCalledWith(filter, { workout: 'workout-nuevo' });
+    expect(bookingModel.updateMany).toHaveBeenCalledWith(filter, { weightOverrides: expectedOverrides });
+  });
+
+  it('un peso vacío (null a mano) no limpia pesos si no se cambia de entrenamiento', async () => {
+    const bookingModel = makeBookingModelMock();
+    const seriesModel = makeSeriesModelMock();
+    const holidayModel = makeHolidayModelMock();
+    const existing: any = buildExisting();
+    bookingModel.findById.mockResolvedValue(existing);
+    const service = new BookingsService(bookingModel, seriesModel, holidayModel as any, owedSessionsMock as any);
+
+    await service.update('b1', { notes: 'solo cambio la nota' } as any, 't1');
+
+    expect(bookingModel.updateMany).not.toHaveBeenCalled();
+    expect(seriesModel.findByIdAndUpdate).not.toHaveBeenCalled();
   });
 });

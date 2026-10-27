@@ -38,10 +38,11 @@ export class BookingsService {
   ) {}
 
   async create(data: CreateBookingDto): Promise<Booking> {
-    const { workoutId, recurrence, ...rest } = data;
+    const { workoutId, recurrence, weightOverrides, ...rest } = data;
     const startTime = new Date(data.startTime);
     const endTime = new Date(data.endTime);
     const clients = data.clients ?? [];
+    const weightOverridesPayload = weightOverrides?.map((o) => ({ exercise: o.exerciseId, sets: o.sets }));
 
     if (endTime <= startTime) {
       throw new ConflictException('La hora de fin debe ser posterior a la de inicio');
@@ -52,7 +53,7 @@ export class BookingsService {
     if (rest.isInterview) rest.isPrivate = true;
 
     if (recurrence === 'weekly') {
-      return this.createSeries(rest, clients, startTime, endTime, workoutId);
+      return this.createSeries(rest, clients, startTime, endTime, workoutId, weightOverridesPayload);
     }
 
     const created = new this.bookingModel({
@@ -61,6 +62,7 @@ export class BookingsService {
       startTime,
       endTime,
       workout: workoutId || undefined,
+      weightOverrides: weightOverridesPayload,
     });
     const saved = await created.save();
     if (rest.isDebtSettlement) {
@@ -79,11 +81,12 @@ export class BookingsService {
   // semanas; el resto se va generando de pasada según haga falta (ver
   // ensureSeriesGenerated).
   private async createSeries(
-    rest: Omit<CreateBookingDto, 'workoutId' | 'recurrence'>,
+    rest: Omit<CreateBookingDto, 'workoutId' | 'recurrence' | 'weightOverrides'>,
     clients: string[],
     startTime: Date,
     endTime: Date,
     workoutId?: string | null,
+    weightOverridesPayload?: { exercise: string; sets: { reps?: number; weight?: number }[] }[],
   ): Promise<Booking> {
     const durationMinutes = Math.round((endTime.getTime() - startTime.getTime()) / 60000);
 
@@ -93,6 +96,7 @@ export class BookingsService {
       durationMinutes,
       notes: rest.notes,
       workout: workoutId || undefined,
+      weightOverrides: weightOverridesPayload,
       isPrivate: !!rest.isPrivate,
       isInterview: !!rest.isInterview,
       firstStartTime: startTime,
@@ -124,6 +128,7 @@ export class BookingsService {
         endTime: new Date(cursor.getTime() + durationMs),
         notes: series.notes,
         workout: series.workout,
+        weightOverrides: series.weightOverrides,
         isPrivate: series.isPrivate,
         isInterview: series.isInterview,
         series: series._id as any,
@@ -295,11 +300,30 @@ export class BookingsService {
 
     // workoutId no forma parte del schema (el campo se llama "workout");
     // se traduce aparte. undefined = no tocar, null o id = reemplazar.
-    const { workoutId, recurrence, applyWorkoutToSeries, applyTimeToSeries, ...rest } = data;
+    const {
+      workoutId,
+      recurrence,
+      applyWorkoutToSeries,
+      applyTimeToSeries,
+      weightOverrides,
+      ...rest
+    } = data;
     if (rest.isInterview) rest.isPrivate = true;
     const updatePayload: Record<string, unknown> = { ...rest, startTime, endTime };
     if (workoutId !== undefined) {
       updatePayload.workout = workoutId;
+    }
+
+    // exerciseId (DTO) -> exercise (schema). undefined = no tocar.
+    let weightOverridesPayload: { exercise: string; sets: { reps?: number; weight?: number }[] }[] | undefined;
+    if (weightOverrides !== undefined) {
+      weightOverridesPayload = weightOverrides.map((o) => ({ exercise: o.exerciseId, sets: o.sets }));
+      updatePayload.weightOverrides = weightOverridesPayload;
+    } else if (workoutId !== undefined && workoutId !== (existing.workout?.toString() ?? null)) {
+      // Se asigna una plantilla distinta sin mandar pesos nuevos: los
+      // overrides que hubiera apuntarían a ejercicios de la plantilla
+      // vieja, así que se limpian.
+      updatePayload.weightOverrides = [];
     }
 
     // Convertir una sesión puntual en semanal: solo tiene sentido si
@@ -356,11 +380,27 @@ export class BookingsService {
     // se deja en la plantilla de la serie para que las que se generen
     // más adelante también lo lleven.
     if (applyWorkoutToSeries && existing.series && workoutId !== undefined) {
+      // Si esta misma llamada también trae pesos nuevos, esos son los que
+      // se propagan (ver bloque de abajo); si no, al cambiar de plantilla
+      // para toda la serie los overrides viejos tampoco valen ya.
+      const workoutUpdate: Record<string, unknown> = { workout: workoutId };
+      if (weightOverridesPayload === undefined) workoutUpdate.weightOverrides = [];
       await this.bookingModel.updateMany(
         { series: existing.series, startTime: { $gte: startTime }, _id: { $ne: id } },
-        { workout: workoutId },
+        workoutUpdate,
       );
-      await this.seriesModel.findByIdAndUpdate(existing.series, { workout: workoutId });
+      await this.seriesModel.findByIdAndUpdate(existing.series, workoutUpdate);
+    }
+
+    // Pesos: a diferencia del entrenamiento, se propagan siempre hacia
+    // adelante sin preguntar (es rutinario, cada sesión), y nunca a las
+    // sesiones pasadas (startTime < la de esta sesión se queda fuera).
+    if (weightOverridesPayload !== undefined && existing.series) {
+      await this.bookingModel.updateMany(
+        { series: existing.series, startTime: { $gte: startTime }, _id: { $ne: id } },
+        { weightOverrides: weightOverridesPayload },
+      );
+      await this.seriesModel.findByIdAndUpdate(existing.series, { weightOverrides: weightOverridesPayload });
     }
 
     // "Esta y todas las futuras", pero para el día/hora: las sesiones que

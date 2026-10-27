@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
+import { WeightOverrideSlot, WeightOverrideSlotSchema } from './weight-override.schema';
 
 export enum BookingStatus {
   ACTIVE = 'active',
@@ -42,6 +43,13 @@ export class Booking extends Document {
   // compartido por todos sus clientes si es dueto/trio.
   @Prop({ type: Types.ObjectId, ref: 'Workout', required: false })
   workout?: Types.ObjectId;
+
+  // Peso/reps reales de ESTA sesion (no de la plantilla compartida, ver
+  // weight-override.schema.ts): vacio = usar los de la plantilla. Al
+  // editarlo se propaga a esta y a las futuras de la serie, nunca a las
+  // pasadas (ver BookingsService.update).
+  @Prop({ type: [WeightOverrideSlotSchema], default: [] })
+  weightOverrides?: WeightOverrideSlot[];
 
   // Si esta sesion viene de una serie semanal (ver BookingSeries), aqui
   // se guarda cual. Sin valor: sesion puntual normal.

@@ -20,7 +20,11 @@ export class WorkoutsService {
         notes: slot.notes,
       })),
     });
-    return created.save();
+    await created.save();
+    // Igual que findAll: el front pinta el nombre/categoria del ejercicio
+    // de cada slot, así que el doc que se devuelve tiene que venir ya
+    // poblado (si no, "Ejercicio eliminado" aunque exista de verdad).
+    return created.populate('slots.exercise', 'name category');
   }
 
   async update(id: string, data: UpdateWorkoutDto): Promise<Workout> {
@@ -42,7 +46,8 @@ export class WorkoutsService {
       })) as any;
     }
 
-    return existing.save();
+    await existing.save();
+    return existing.populate('slots.exercise', 'name category');
   }
 
   async findAll(): Promise<Workout[]> {

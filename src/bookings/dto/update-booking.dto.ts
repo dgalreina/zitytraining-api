@@ -1,6 +1,8 @@
-import { IsBoolean, IsEnum, IsOptional } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsArray, IsBoolean, IsEnum, IsOptional, ValidateNested } from 'class-validator';
 import { PartialType } from '@nestjs/mapped-types';
 import { CreateBookingDto } from './create-booking.dto';
+import { WeightOverrideSlotDto } from './weight-override.dto';
 import { BookingStatus } from '../bookings.schema';
 
 export class UpdateBookingDto extends PartialType(CreateBookingDto) {
@@ -34,4 +36,15 @@ export class UpdateBookingDto extends PartialType(CreateBookingDto) {
   @IsOptional()
   @IsBoolean()
   applyTimeToSeries?: boolean;
+
+  // Pesos/reps reales de esta sesion (ver weight-override.schema.ts).
+  // undefined = no tocar; [] = quitar overrides y volver a los de la
+  // plantilla. Si la sesion es de una serie, se propaga siempre a esta y
+  // a las futuras (nunca a las pasadas): no hace falta un flag como
+  // applyWorkoutToSeries, es automatico (ver BookingsService.update).
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => WeightOverrideSlotDto)
+  weightOverrides?: WeightOverrideSlotDto[];
 }
