@@ -149,9 +149,21 @@ export class AttendanceService {
     return open ? { clockedIn: true, since: open.clockIn } : { clockedIn: false };
   }
 
-  async findByTrainer(trainerId: string): Promise<TimeEntry[]> {
+  // from/to acotan por clockIn (opcional): sin ellos, todo el histórico
+  // (la lista editable de "Mi fichaje"); con ellos, un mes concreto (para
+  // el calendario semanal propio y su total de horas).
+  async findByTrainer(trainerId: string, from?: string, to?: string): Promise<TimeEntry[]> {
     await this.resolveForgottenClockOuts({ trainer: trainerId });
-    return this.timeEntryModel.find({ trainer: trainerId }).sort({ clockIn: -1 }).exec();
+
+    const filter: Record<string, unknown> = { trainer: trainerId };
+    if (from || to) {
+      const clockIn: Record<string, Date> = {};
+      if (from) clockIn.$gte = new Date(from);
+      if (to) clockIn.$lte = new Date(to);
+      filter.clockIn = clockIn;
+    }
+
+    return this.timeEntryModel.find(filter).sort({ clockIn: -1 }).exec();
   }
 
   // Para el admin: todos los fichajes de todos los entrenadores. from/to

@@ -62,8 +62,8 @@ export class AttendanceController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN, Role.TRAINER)
   @Get('me')
-  findMine(@Req() req: any) {
-    return this.attendanceService.findByTrainer(req.user.userId);
+  findMine(@Req() req: any, @Query('from') from?: string, @Query('to') to?: string) {
+    return this.attendanceService.findByTrainer(req.user.userId, from, to);
   }
 
   // Para el admin: fichajes de todos los entrenadores.
