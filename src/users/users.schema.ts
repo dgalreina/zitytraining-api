@@ -69,6 +69,12 @@ export class User extends Document {
   @Prop({ required: false })
   color?: string; // color asignado al entrenador, ej. '#6aa842'
 
+  // Plantilla propia para los recordatorios de WhatsApp (ver
+  // lib/reminderTemplate.ts en el front): admite {nombre} y {fecha}. Sin
+  // valor, se usa la plantilla por defecto.
+  @Prop({ required: false, trim: true, maxlength: 1000 })
+  defaultReminderMessage?: string;
+
   // Clientes que este entrenador ha marcado como favoritos (cada
   // entrenador tiene su propia lista, no es un flag global del cliente).
   @Prop({ type: [{ type: Types.ObjectId, ref: 'User' }], default: [] })
