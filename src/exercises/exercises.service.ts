@@ -7,20 +7,63 @@ function escapeRegex(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+const SEARCH_STOPWORDS = new Set(['de', 'del', 'la', 'el', 'los', 'las', 'y', 'a', 'en', 'con']);
+
+function normalizeForSearch(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '');
+}
+
+function levenshtein(a: string, b: string): number {
+  if (a === b) return 0;
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+  let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const row = [i];
+    for (let j = 1; j <= b.length; j++) {
+      row[j] = Math.min(prev[j] + 1, row[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+    prev = row;
+  }
+  return prev[b.length];
+}
+
+// Una palabra de la busqueda "encaja" en una palabra del nombre si es
+// substring suya, o (a partir de 4 letras, para no disparar falsos
+// positivos con palabras cortas) si solo se diferencian en una letra.
+function wordMatches(queryWord: string, nameWord: string): boolean {
+  if (nameWord.includes(queryWord)) return true;
+  if (queryWord.length < 4) return false;
+  return levenshtein(queryWord, nameWord) <= 1;
+}
+
 @Injectable()
 export class ExercisesService {
   constructor(@InjectModel(Exercise.name) private exerciseModel: Model<Exercise>) {}
 
-  // El frontend ya exige 3 letras minimo antes de llamar; aqui solo se
-  // acota para no devolver listas enormes si llega una query muy corta.
+  // Busqueda por palabras sueltas (no importa el orden ni si falta un "de")
+  // y tolerante a una errata por palabra. El catalogo es pequeño (base +
+  // lo que añade cada entrenador), así que se trae entero y se puntua en
+  // memoria en vez de depender de un regex de substring exacto.
   async search(query: string): Promise<Exercise[]> {
     const trimmed = query.trim();
     if (trimmed.length < 2) return [];
-    return this.exerciseModel
-      .find({ name: { $regex: escapeRegex(trimmed), $options: 'i' } })
-      .sort({ name: 1 })
-      .limit(10)
-      .exec();
+
+    const queryWords = normalizeForSearch(trimmed)
+      .split(/\s+/)
+      .filter((w) => w.length > 0 && !SEARCH_STOPWORDS.has(w));
+    if (queryWords.length === 0) return [];
+
+    const all = await this.exerciseModel.find().sort({ name: 1 }).exec();
+    const matches = all.filter((ex) => {
+      const nameWords = normalizeForSearch(ex.name).split(/\s+/);
+      return queryWords.every((qw) => nameWords.some((nw) => wordMatches(qw, nw)));
+    });
+
+    return matches.slice(0, 10);
   }
 
   // Si ya existe uno con el mismo nombre (sin distinguir mayusculas) se
