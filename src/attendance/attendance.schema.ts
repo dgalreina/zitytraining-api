@@ -14,7 +14,7 @@ export class TimeEntry extends Document {
   @Prop({ required: false })
   clockOut?: Date;
 
-  // Si nadie fichó la salida, el sistema la cierra solo a las 22:00 de
+  // Si nadie fichó la salida, el sistema la cierra solo a las 23:00 de
   // ese mismo día (ver resolveForgottenClockOuts en el service).
   @Prop({ default: false })
   autoClockedOut!: boolean;

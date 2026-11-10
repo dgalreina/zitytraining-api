@@ -43,7 +43,7 @@ export function parseMadridDateTime(value: string): Date {
 }
 
 // Mismo problema que parseMadridDateTime pero al revés: para calcular
-// "las 22:00 de ese día" hace falta saber qué día es EN MADRID (no en el
+// "las 23:00 de ese día" hace falta saber qué día es EN MADRID (no en el
 // servidor) y fijar la hora en esa misma zona.
 export function atMadridHour(date: Date, hour: number): Date {
   return DateTime.fromJSDate(date, { zone: GYM_TIMEZONE })

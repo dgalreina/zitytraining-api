@@ -5,7 +5,7 @@ import { TimeEntry } from './attendance.schema';
 import { UpdateTimeEntryDto } from './dto/update-time-entry.dto';
 import { atMadridHour, parseMadridDateTime } from '../bookings/timezone';
 
-const AUTO_CLOCK_OUT_HOUR = 22;
+const AUTO_CLOCK_OUT_HOUR = 23;
 
 function cutoffFor(date: Date): Date {
   return atMadridHour(date, AUTO_CLOCK_OUT_HOUR);
@@ -15,7 +15,7 @@ function cutoffFor(date: Date): Date {
 export class AttendanceService {
   constructor(@InjectModel(TimeEntry.name) private timeEntryModel: Model<TimeEntry>) {}
 
-  // Cierra solos los fichajes abiertos cuyo dia ya paso de las 22:00, en
+  // Cierra solos los fichajes abiertos cuyo dia ya paso de las 23:00, en
   // vez de dejarlos fichados para siempre porque alguien se olvido de
   // fichar la salida. Se llama de pasada al listar o al fichar de nuevo,
   // no hay tarea programada aparte (mismo patron que los planes puntuales).
