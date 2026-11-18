@@ -48,10 +48,6 @@ export class BookingsService {
       throw new ConflictException('La hora de fin debe ser posterior a la de inicio');
     }
 
-    // Una entrevista es privada por definición: se fuerza aquí para que
-    // ningún cliente de la API pueda crear una "entrevista pública".
-    if (rest.isInterview) rest.isPrivate = true;
-
     if (recurrence === 'weekly') {
       return this.createSeries(rest, clients, startTime, endTime, workoutId, weightOverridesPayload);
     }
@@ -308,7 +304,6 @@ export class BookingsService {
       weightOverrides,
       ...rest
     } = data;
-    if (rest.isInterview) rest.isPrivate = true;
     const updatePayload: Record<string, unknown> = { ...rest, startTime, endTime };
     if (workoutId !== undefined) {
       updatePayload.workout = workoutId;

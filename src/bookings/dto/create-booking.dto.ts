@@ -38,7 +38,8 @@ export class CreateBookingDto {
   @IsBoolean()
   isPrivate?: boolean;
 
-  // Implica isPrivate (lo fuerza el servicio aunque no venga).
+  // Independiente de isPrivate: una entrevista la ve y gestiona
+  // cualquier entrenador igual que una sesión normal.
   @IsOptional()
   @IsBoolean()
   isInterview?: boolean;
